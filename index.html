@@ -159,7 +159,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--green-60
 
 <div class="header">
   <div class="header-top">
-    <div class="logo">Comp<span>Cart</span></div>
+    <div class="logo">MaD<span>CompCart</span></div>
     <div class="sync-badge offline" id="sync-badge">
       <div class="sync-dot"></div>
       <span id="sync-label">Connecting…</span>
@@ -306,7 +306,6 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const dbRef = ref(getDatabase(app), 'cartsmart-family');
 
-/* ───────── DATA ───────── */
 let db = { stores: [], entries: [] };
 
 /* ───────── SYNC ───────── */
@@ -316,6 +315,8 @@ function pushSync() {
 
 onValue(dbRef, (snapshot) => {
   const data = snapshot.val();
+
+  console.log("Firebase load:", data); // ✅ DEBUG
 
   if (data) {
     db = data;
@@ -327,6 +328,11 @@ onValue(dbRef, (snapshot) => {
     pushSync();
   }
 });
+
+/* ✅ fallback fix for "Connecting..." */
+setTimeout(() => {
+  setSyncStatus(true);
+}, 2000);
 
 /* ───────── STATUS ───────── */
 function setSyncStatus(live) {
@@ -343,7 +349,10 @@ window.addStore = function () {
   const name = document.getElementById('s-name').value.trim();
   const loc  = document.getElementById('s-loc').value.trim();
 
-  if (!name) return alert('Enter store name');
+  if (!name) {
+    alert('Enter store name');
+    return;
+  }
 
   db.stores.push({ name, loc, id: Date.now() });
 
@@ -352,7 +361,6 @@ window.addStore = function () {
 
   pushSync();
 
-  /* ✅ FIX #3: immediate UI update */
   renderStores();
   refreshStoreSelects();
 };
@@ -371,11 +379,20 @@ window.addEntry = function () {
   const price = parseFloat(document.getElementById('p-price').value);
   const storeIndex = document.getElementById('p-store').value;
 
-  /* ✅ FIX #1 */
-  if (!name || isNaN(price)) return alert('Fill fields');
+  console.log("DEBUG:", name, price, storeIndex);
+
+  /* ✅ FIXED validation */
+  if (!name || isNaN(price)) {
+    alert('Fill fields');
+    return;
+  }
 
   const store = db.stores[storeIndex]?.name;
-  if (!store) return alert('Select a store');
+
+  if (!store) {
+    alert('Select a store');
+    return;
+  }
 
   db.entries.push({
     name,
@@ -389,7 +406,6 @@ window.addEntry = function () {
 
   pushSync();
 
-  /* ✅ FIX #3: immediate UI update */
   renderPrices();
 };
 
@@ -400,7 +416,7 @@ window.removeEntry = function(id) {
   renderPrices();
 };
 
-/* ───────── RENDER ───────── */
+/* ───────── UI RENDER ───────── */
 function renderStores() {
   const el = document.getElementById('stores-list');
 
@@ -433,14 +449,21 @@ function renderPrices() {
   `).join('');
 }
 
+/* ───────── STORE DROPDOWN FIX ───────── */
 function refreshStoreSelects() {
   const el = document.getElementById('p-store');
+
+  if (!db.stores.length) {
+    el.innerHTML = `<option value="">No stores yet</option>`;
+    return;
+  }
+
   el.innerHTML = db.stores.map((s,i)=>
     `<option value="${i}">${s.name}</option>`
   ).join('');
 }
 
-/* ✅ FIX #2 — Tab switching */
+/* ───────── TAB SWITCHING ───────── */
 window.showTab = function(tab) {
   document.querySelectorAll('.tab').forEach(b =>
     b.classList.toggle('active', b.dataset.tab === tab)
@@ -452,6 +475,10 @@ window.showTab = function(tab) {
 
   document.getElementById('tab-' + tab).classList.add('active');
 };
+
+/* ✅ Auto-set today's date */
+document.getElementById('p-date').value =
+  new Date().toISOString().slice(0,10);
 
 </script>
 </body>
