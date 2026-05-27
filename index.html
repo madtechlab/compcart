@@ -327,6 +327,7 @@ onValue(dbRef, (snapshot) => {
     renderStores();
     renderPrices();
     refreshStoreSelects();
+    renderDeals();            // ✅ ADD THIS LINE
     setSyncStatus(true);
   } else {
     pushSync();
@@ -496,7 +497,11 @@ function refreshStoreSelects() {
   const el = document.getElementById('deals-content');
 
   if (!db.entries.length) {
-    el.innerHTML = "No data yet";
+    el.innerHTML = `
+  <div class="empty">
+    Add prices in multiple stores to see your savings here.
+  </div>
+`;
     return;
   }
 
