@@ -316,10 +316,14 @@ function pushSync() {
 onValue(dbRef, (snapshot) => {
   const data = snapshot.val();
 
-  console.log("Firebase load:", data); // ✅ DEBUG
+  console.log("Firebase load:", data);
 
   if (data) {
-    db = data;
+    db = {
+      stores: data.stores || [],
+      entries: data.entries || []
+    };
+
     renderStores();
     renderPrices();
     refreshStoreSelects();
