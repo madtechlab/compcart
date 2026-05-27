@@ -468,6 +468,54 @@ function refreshStoreSelects() {
   ).join('');
 }
 
+/* ───────── CALCULATE BEST DEALS ───────── */
+  function calculateBestDeals() {
+  const result = {};
+
+  db.entries.forEach(item => {
+    if (!result[item.name]) {
+      result[item.name] = {
+        best: item,
+        worst: item
+      };
+    } else {
+      if (item.price < result[item.name].best.price) {
+        result[item.name].best = item;
+      }
+      if (item.price > result[item.name].worst.price) {
+        result[item.name].worst = item;
+      }
+    }
+  });
+
+  return result;
+}
+
+/* ───────── RENDER BEST DEALS ───────── */
+  function renderDeals() {
+  const el = document.getElementById('deals-content');
+
+  if (!db.entries.length) {
+    el.innerHTML = "No data yet";
+    return;
+  }
+
+  const deals = calculateBestDeals();
+
+  el.innerHTML = Object.keys(deals).map(name => {
+    const d = deals[name];
+    const savings = d.worst.price - d.best.price;
+
+    return `
+      <div class="card">
+        <b>${name}</b><br>
+        ✅ Best: ${d.best.store} — $${d.best.price.toFixed(2)}<br>
+        💰 Save: $${savings.toFixed(2)}
+      </div>
+    `;
+  }).join('');
+}
+  
 /* ───────── TAB SWITCHING ───────── */
 window.showTab = function(tab) {
   document.querySelectorAll('.tab').forEach(b =>
@@ -479,6 +527,8 @@ window.showTab = function(tab) {
   );
 
   document.getElementById('tab-' + tab).classList.add('active');
+
+  if (tab === 'deals') renderDeals();   // ✅ ADD THIS LINE
 };
 
 /* ✅ Auto-set today's date */
