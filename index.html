@@ -392,6 +392,7 @@ window.addEntry = function () {
   }
 
   const store = db.stores[storeIndex]?.name;
+  if (!db.entries) db.entries = [];
 
   if (!store) {
     alert('Select a store');
