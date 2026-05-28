@@ -288,89 +288,12 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--green-60
 </div>
 
 <div id="toast"></div>
-<script>
 
-/* ───────── ADD THESE FUNCTIONS ───────── */
-
-function removeEntry(id) {
-  db.entries = db.entries.filter(e => e.id !== id);
-
-  pushSync();
-  renderPrices();
-  renderDeals();
-  updateSavingsBadge();
-}
-
-function removeStore(id) {
-  db.stores = db.stores.filter(s => s.id !== id);
-
-  pushSync();
-  renderStores();
-  refreshStoreSelects();
-  renderDeals();
-  updateSavingsBadge();
-}
-
-/* ✅ CRITICAL: expose to global scope */
-window.removeEntry = removeEntry;
-window.removeStore = removeStore;
-
-};
-
-/* ───────── MODIFY renderStores ───────── */
-
-function renderStores() {
-  const el = document.getElementById('stores-list');
-
-  if (!db.stores.length) {
-    el.innerHTML = "No stores yet";
-    return;
-  }
-
-  el.innerHTML = db.stores.map(s => `
-    <div class="card" style="display:flex;justify-content:space-between;align-items:center;">
-      <div>${s.name}</div>
-
-      <button class="del-btn" onclick="removeStore(${s.id})">
-        <svg viewBox="0 0 24 24">
-          <line x1="18" y1="6" x2="6" y2="18"/>
-          <line x1="6" y1="6" x2="18" y2="18"/>
-        </svg>
-      </button>
-    </div>
-  `).join('');
-}
-
-/* ───────── MODIFY renderPrices ───────── */
-
-function renderPrices() {
-  const el = document.getElementById('prices-list');
-
-  if (!db.entries.length) {
-    el.innerHTML = "No prices yet";
-    return;
-  }
-
-  el.innerHTML = db.entries.map(e => `
-    <div class="card" style="display:flex;justify-content:space-between;align-items:center;">
-      <div>
-        ${e.name} — ${e.store} — $${e.price.toFixed(2)}
-      </div>
-
-      <button class="del-btn" onclick="removeEntry(${e.id})">
-        <svg viewBox="0 0 24 24">
-          <line x1="18" y1="6" x2="6" y2="18"/>
-          <line x1="6" y1="6" x2="18" y2="18"/>
-        </svg>
-      </button>
-    </div>
-  `).join('');
-}
+<script type="module">
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
-/* ✅ Firebase Config */
 const firebaseConfig = {
   apiKey: "YOUR_KEY",
   authDomain: "mad-compcart.firebaseapp.com",
@@ -385,6 +308,24 @@ const app = initializeApp(firebaseConfig);
 const dbRef = ref(getDatabase(app), 'cartsmart-family');
 
 let db = { stores: [], entries: [] };
+
+/* ✅ GLOBAL FUNCTIONS (FIXES BUTTONS + TABS) */
+window.showTab = showTab;
+window.addEntry = addEntry;
+window.addStore = addStore;
+window.removeEntry = removeEntry;
+window.removeStore = removeStore;
+
+/* ───────── DELETE FUNCTIONS ───────── */
+function removeEntry(id) {
+  db.entries = db.entries.filter(e => e.id !== id);
+  pushSync();
+}
+
+function removeStore(id) {
+  db.stores = db.stores.filter(s => s.id !== id);
+  pushSync();
+}
 
 /* ───────── SYNC ───────── */
 function pushSync() {
@@ -404,7 +345,7 @@ onValue(dbRef, (snapshot) => {
     renderPrices();
     refreshStoreSelects();
     renderDeals();
-    updateSavingsBadge();   // ✅ NEW
+    updateSavingsBadge();
     setSyncStatus(true);
   } else {
     pushSync();
@@ -415,14 +356,13 @@ onValue(dbRef, (snapshot) => {
 function setSyncStatus(live) {
   const badge = document.getElementById('sync-badge');
   const label = document.getElementById('sync-label');
-  if (!badge) return;
 
   badge.className = 'sync-badge ' + (live ? 'live' : 'offline');
-  label.textContent = live ? 'Synced' : 'Offline';
+  label.textContent = live ? 'Synced' : 'Connecting…';
 }
 
 /* ───────── STORES ───────── */
-window.addStore = function () {
+function addStore() {
   const name = document.getElementById('s-name').value.trim();
   const loc  = document.getElementById('s-loc').value.trim();
 
@@ -434,12 +374,10 @@ window.addStore = function () {
   document.getElementById('s-loc').value = '';
 
   pushSync();
-  renderStores();
-  refreshStoreSelects();
-};
+}
 
 /* ───────── ENTRIES ───────── */
-window.addEntry = function () {
+function addEntry() {
   const name = document.getElementById('p-name').value.trim();
   const price = parseFloat(document.getElementById('p-price').value);
   const storeIndex = document.getElementById('p-store').value;
@@ -447,36 +385,24 @@ window.addEntry = function () {
   if (!name || isNaN(price)) return alert('Fill fields');
 
   const store = db.stores[storeIndex]?.name;
-  if (!db.entries) db.entries = [];
   if (!store) return alert('Select a store');
 
-  const entry = { name, price, store, id: Date.now() };
-
-  db.entries.push(entry);
-
-  checkPriceAlerts(entry);     // ✅ NEW ALERT
+  db.entries.push({ name, price, store, id: Date.now() });
 
   document.getElementById('p-name').value = '';
   document.getElementById('p-price').value = '';
 
   pushSync();
-  renderPrices();
-  renderDeals();               // ✅ INSTANT UPDATE
-  updateSavingsBadge();        // ✅ INSTANT UPDATE
-};
+}
 
-/* ───────── RENDER ───────── */
+/* ───────── RENDER (WITH DELETE BUTTONS) ───────── */
 function renderStores() {
   const el = document.getElementById('stores-list');
 
-  if (!db.stores.length) {
-    el.innerHTML = "No stores yet";
-    return;
-  }
-
   el.innerHTML = db.stores.map(s => `
-    <div class="card">
-      ${s.name}
+    <div class="card" style="display:flex;justify-content:space-between;">
+      <div>${s.name}</div>
+      <button class="del-btn" onclick="removeStore(${s.id})">✖</button>
     </div>
   `).join('');
 }
@@ -484,134 +410,61 @@ function renderStores() {
 function renderPrices() {
   const el = document.getElementById('prices-list');
 
-  if (!db.entries.length) {
-    el.innerHTML = "No prices yet";
-    return;
-  }
-
   el.innerHTML = db.entries.map(e => `
-    <div class="card">
-      ${e.name} — ${e.store} — $${e.price.toFixed(2)}
+    <div class="card" style="display:flex;justify-content:space-between;">
+      <div>${e.name} — ${e.store} — $${e.price.toFixed(2)}</div>
+      <button class="del-btn" onclick="removeEntry(${e.id})">✖</button>
     </div>
   `).join('');
 }
 
-/* ───────── STORE DROPDOWN ───────── */
 function refreshStoreSelects() {
-  const el = document.getElementById('p-store');
-
-  el.innerHTML = db.stores.map((s,i)=>
-    `<option value="${i}">${s.name}</option>`
-  ).join('');
+  document.getElementById('p-store').innerHTML =
+    db.stores.map((s,i)=> `<option value="${i}">${s.name}</option>`).join('');
 }
 
-/* ───────── DEAL LOGIC ───────── */
+/* ───────── DEALS ───────── */
 function calculateBestDeals() {
   const result = {};
-
   db.entries.forEach(item => {
-    if (!result[item.name]) {
-      result[item.name] = { best: item, worst: item };
-    } else {
-      if (item.price < result[item.name].best.price)
-        result[item.name].best = item;
-
-      if (item.price > result[item.name].worst.price)
-        result[item.name].worst = item;
+    if (!result[item.name]) result[item.name] = { best:item, worst:item };
+    else {
+      if (item.price < result[item.name].best.price) result[item.name].best = item;
+      if (item.price > result[item.name].worst.price) result[item.name].worst = item;
     }
   });
-
   return result;
 }
 
-function calculateShoppingPlan() {
-  const deals = calculateBestDeals();
-  const plan = {};
-
-  Object.keys(deals).forEach(name => {
-    const best = deals[name].best;
-
-    if (!plan[best.store]) plan[best.store] = [];
-    plan[best.store].push(best);
-  });
-
-  return plan;
-}
-
-/* ───────── RENDER DEALS (CLEAN) ───────── */
 function renderDeals() {
   const el = document.getElementById('deals-content');
-
-  if (!db.entries.length) {
-    el.innerHTML = `
-      <div class="empty">
-        Add prices in multiple stores to see your savings here.
-      </div>
-    `;
-    return;
-  }
-
-  renderShoppingPlan();
-}
-
-function renderShoppingPlan() {
-  const el = document.getElementById('deals-content');
-  const plan = calculateShoppingPlan();
-
-  let totalSavings = 0;
-  Object.values(calculateBestDeals()).forEach(d => {
-    totalSavings += (d.worst.price - d.best.price);
-  });
+  const deals = calculateBestDeals();
+  let total = 0;
 
   el.innerHTML = `
     <div class="card">
-      <b>🛒 Smart Shopping Plan</b><br><br>
-      ${Object.keys(plan).map(store => `
-        <b>${store}</b><br>
-        ${plan[store].map(item =>
-          `• ${item.name} — $${item.price.toFixed(2)}`
-        ).join('<br>')}
-        <br><br>
-      `).join('')}
-      <hr>
-      💰 Total Savings: $${totalSavings.toFixed(2)}
+      ${Object.values(deals).map(d => {
+        total += d.worst.price - d.best.price;
+        return `• ${d.best.name} — ${d.best.store}`;
+      }).join('<br>')}
+      <hr>💰 $${total.toFixed(2)} saved
     </div>
   `;
 }
 
-/* ───────── SAVINGS BADGE ✅ NEW ───────── */
-function calculateTotalSavings() {
+/* ───────── SAVINGS ───────── */
+function updateSavingsBadge() {
   let total = 0;
-
   Object.values(calculateBestDeals()).forEach(d => {
-    total += (d.worst.price - d.best.price);
+    total += d.worst.price - d.best.price;
   });
 
-  return total;
-}
-
-function updateSavingsBadge() {
-  const el = document.getElementById('savings-badge');
-  if (!el) return;
-
-  const savings = calculateTotalSavings();
-
-  el.textContent = savings
-    ? `💰 You save $${savings.toFixed(2)}`
-    : '';
-}
-
-/* ───────── ALERTS ✅ NEW ───────── */
-function checkPriceAlerts(entry) {
-  const threshold = 5;
-
-  if (entry.price < threshold) {
-    alert(`${entry.name} dropped below $${threshold}! ✅`);
-  }
+  document.getElementById('savings-badge').textContent =
+    total ? `💰 You save $${total.toFixed(2)}` : '';
 }
 
 /* ───────── TABS ───────── */
-window.showTab = function(tab) {
+function showTab(tab) {
   document.querySelectorAll('.tab').forEach(b =>
     b.classList.toggle('active', b.dataset.tab === tab)
   );
@@ -623,9 +476,9 @@ window.showTab = function(tab) {
   document.getElementById('tab-' + tab).classList.add('active');
 
   if (tab === 'deals') renderDeals();
-};
+}
 
-/* ✅ Auto date */
+/* ✅ DATE */
 document.getElementById('p-date').value =
   new Date().toISOString().slice(0,10);
 
