@@ -290,6 +290,77 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--green-60
 <div id="toast"></div>
 <script type="module">
 
+/* ───────── ADD THESE FUNCTIONS ───────── */
+
+window.removeEntry = function(id) {
+  db.entries = db.entries.filter(e => e.id !== id);
+
+  pushSync();
+  renderPrices();
+  renderDeals();
+  updateSavingsBadge();
+};
+
+window.removeStore = function(id) {
+  db.stores = db.stores.filter(s => s.id !== id);
+
+  pushSync();
+  renderStores();
+  refreshStoreSelects();
+  renderDeals();
+  updateSavingsBadge();
+};
+
+/* ───────── MODIFY renderStores ───────── */
+
+function renderStores() {
+  const el = document.getElementById('stores-list');
+
+  if (!db.stores.length) {
+    el.innerHTML = "No stores yet";
+    return;
+  }
+
+  el.innerHTML = db.stores.map(s => `
+    <div class="card" style="display:flex;justify-content:space-between;align-items:center;">
+      <div>${s.name}</div>
+
+      <button class="del-btn" onclick="removeStore(${s.id})">
+        <svg viewBox="0 0 24 24">
+          <line x1="18" y1="6" x2="6" y2="18"/>
+          <line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+  `).join('');
+}
+
+/* ───────── MODIFY renderPrices ───────── */
+
+function renderPrices() {
+  const el = document.getElementById('prices-list');
+
+  if (!db.entries.length) {
+    el.innerHTML = "No prices yet";
+    return;
+  }
+
+  el.innerHTML = db.entries.map(e => `
+    <div class="card" style="display:flex;justify-content:space-between;align-items:center;">
+      <div>
+        ${e.name} — ${e.store} — $${e.price.toFixed(2)}
+      </div>
+
+      <button class="del-btn" onclick="removeEntry(${e.id})">
+        <svg viewBox="0 0 24 24">
+          <line x1="18" y1="6" x2="6" y2="18"/>
+          <line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+  `).join('');
+}
+
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
