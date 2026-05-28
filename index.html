@@ -6,22 +6,63 @@
 <title>MaD CompCart</title>
 
 <style>
-body{font-family:Arial;margin:0;background:#f5f5f5}
-.header{background:#1a472a;color:white;padding:15px}
-.logo{font-size:20px;font-weight:bold}
-.section{padding:15px}
-.card{
+body {
+  font-family: Arial;
+  background:#f5f5f5;
+  margin:0;
+}
+
+.header {
+  background:#1a472a;
+  color:white;
+  padding:16px;
+}
+
+.logo {
+  font-size:22px;
+  font-weight:bold;
+}
+
+#savings-badge {
+  margin-top:5px;
+  font-size:14px;
+}
+
+.container {
+  padding:16px;
+  max-width:600px;
+  margin:auto;
+}
+
+.card {
   background:white;
-  padding:12px;
+  padding:14px;
   margin-bottom:10px;
-  border-radius:10px;
+  border-radius:12px;
   display:flex;
   justify-content:space-between;
-  align-items:center
+  align-items:center;
+  box-shadow:0 2px 6px rgba(0,0,0,0.1);
 }
-button{cursor:pointer}
-.btn{padding:8px 12px;margin-top:5px}
-.delete{background:none;border:none;color:red;font-size:16px}
+
+input, select {
+  padding:8px;
+  margin:5px 0;
+  width:100%;
+}
+
+button {
+  padding:8px 12px;
+  margin-top:8px;
+  cursor:pointer;
+}
+
+.delete {
+  background:none;
+  border:none;
+  color:red;
+  font-size:16px;
+}
 </style>
 </head>
 
@@ -32,17 +73,17 @@ button{cursor:pointer}
   <div id="savings-badge"></div>
 </div>
 
-<div class="section">
+<div class="container">
 
 <h3>Add Store</h3>
 <input id="s-name" placeholder="Store name">
-<button class="btn" onclick="addStore()">Add</button>
+<button onclick="addStore()">Add Store</button>
 
 <h3>Add Price</h3>
-<input id="p-name" placeholder="Item">
+<input id="p-name" placeholder="Item name">
 <input id="p-price" type="number" placeholder="Price">
 <select id="p-store"></select>
-<button class="btn" onclick="addEntry()">Add</button>
+<button onclick="addEntry()">Add Price</button>
 
 <h3>Prices</h3>
 <div id="prices-list"></div>
@@ -50,7 +91,7 @@ button{cursor:pointer}
 <h3>Stores</h3>
 <div id="stores-list"></div>
 
-<h3>Deals</h3>
+<h3>Smart Plan</h3>
 <div id="deals-content"></div>
 
 </div>
@@ -60,18 +101,19 @@ let db = { stores: [], entries: [] };
 
 /* STORE */
 function addStore(){
-  const name = sName().value.trim();
+  const name = document.getElementById("s-name").value.trim();
   if(!name) return alert("Enter store");
 
-  db.stores.push({id:Date.now(),name});
-  sName().value="";
+  db.stores.push({ id:Date.now(), name });
+  document.getElementById("s-name").value="";
 
   renderStores();
   refreshStores();
 }
 
+/* ✅ DELETE STORE */
 function removeStore(id){
-  db.stores = db.stores.filter(s=>s.id!==id);
+  db.stores = db.stores.filter(s=>s.id !== id);
 
   renderStores();
   refreshStores();
@@ -81,29 +123,34 @@ function removeStore(id){
 
 /* ENTRY */
 function addEntry(){
-  const name = pName().value.trim();
-  const price = parseFloat(pPrice().value);
+  const name = document.getElementById("p-name").value.trim();
+  const price = parseFloat(document.getElementById("p-price").value);
+  const storeIndex = document.getElementById("p-store").value;
 
   if(!name || isNaN(price)) return alert("Fill fields");
   if(!db.stores.length) return alert("Add store first");
 
-  const store = db.stores[pStore().value].name;
+  const store = db.stores[storeIndex].name;
 
-  const entry={id:Date.now(),name,price,store};
+  const entry = { id:Date.now(), name, price, store };
   db.entries.push(entry);
 
-  checkAlert(entry);
+  /* ✅ ALERT */
+  if(price < 5){
+    alert(`${name} dropped below $5 ✅`);
+  }
 
-  pName().value="";
-  pPrice().value="";
+  document.getElementById("p-name").value="";
+  document.getElementById("p-price").value="";
 
   renderPrices();
   renderDeals();
   updateSavings();
 }
 
+/* ✅ DELETE ENTRY */
 function removeEntry(id){
-  db.entries = db.entries.filter(e=>e.id!==id);
+  db.entries = db.entries.filter(e=>e.id !== id);
 
   renderPrices();
   renderDeals();
@@ -115,11 +162,11 @@ function renderStores(){
   const el = document.getElementById("stores-list");
 
   if(!db.stores.length){
-    el.innerHTML="No stores";
+    el.innerHTML="No stores yet";
     return;
   }
 
-  el.innerHTML = db.stores.map(s=>`
+  el.innerHTML = db.stores.map(s => `
     <div class="card">
       ${s.name}
       <button class="delete" onclick="removeStore(${s.id})">❌</button>
@@ -131,11 +178,11 @@ function renderPrices(){
   const el = document.getElementById("prices-list");
 
   if(!db.entries.length){
-    el.innerHTML="No prices";
+    el.innerHTML="No prices yet";
     return;
   }
 
-  el.innerHTML = db.entries.map(e=>`
+  el.innerHTML = db.entries.map(e => `
     <div class="card">
       ${e.name} — ${e.store} — $${e.price.toFixed(2)}
       <button class="delete" onclick="removeEntry(${e.id})">❌</button>
@@ -144,93 +191,66 @@ function renderPrices(){
 }
 
 function refreshStores(){
-  const el = pStore();
+  const el = document.getElementById("p-store");
+
   el.innerHTML = db.stores.map((s,i)=>
     `<option value="${i}">${s.name}</option>`
   ).join("");
 }
 
-/* DEAL LOGIC */
-function bestDeals(){
-  const map={};
+/* DEALS */
+function calculateDeals(){
+  const map = {};
 
   db.entries.forEach(e=>{
     if(!map[e.name]) map[e.name]={best:e,worst:e};
     else{
-      if(e.price<map[e.name].best.price) map[e.name].best=e;
-      if(e.price>map[e.name].worst.price) map[e.name].worst=e;
+      if(e.price < map[e.name].best.price) map[e.name].best=e;
+      if(e.price > map[e.name].worst.price) map[e.name].worst=e;
     }
   });
 
   return map;
 }
 
-function plan(){
-  const p={};
-  const deals=bestDeals();
-
-  Object.values(deals).forEach(d=>{
-    const b=d.best;
-    if(!p[b.store]) p[b.store]=[];
-    p[b.store].push(b);
-  });
-
-  return p;
-}
-
 function renderDeals(){
-  const el=document.getElementById("deals-content");
+  const el = document.getElementById("deals-content");
 
   if(!db.entries.length){
-    el.innerHTML="No data";
+    el.innerHTML="No data yet";
     return;
   }
 
-  const p=plan();
-  let total=0;
+  const deals = calculateDeals();
+  let total = 0;
 
-  Object.values(bestDeals()).forEach(d=>{
-    total+=d.worst.price-d.best.price;
-  });
+  const html = Object.values(deals).map(d=>{
+    total += (d.worst.price - d.best.price);
 
-  el.innerHTML=`
-    <div class="card" style="flex-direction:column;align-items:flex-start">
-      <b>Smart Plan</b><br><br>
-      ${Object.keys(p).map(store=>`
-        <b>${store}</b><br>
-        ${p[store].map(i=>`• ${i.name} $${i.price}`).join("<br>")}
-        <br><br>
-      `).join("")}
-      <b>Total Saved: $${total.toFixed(2)}</b>
-    </div>
-  `;
+    return `
+      <div class="card">
+        <div>
+          ${d.best.name}<br>
+          Best: ${d.best.store} - $${d.best.price.toFixed(2)}
+        </div>
+      </div>
+    `;
+  }).join("");
+
+  el.innerHTML = html + `<b>Total Saved: $${total.toFixed(2)}</b>`;
 }
 
-/* SAVINGS */
+/* SAVINGS BADGE */
 function updateSavings(){
-  let total=0;
+  let total = 0;
 
-  Object.values(bestDeals()).forEach(d=>{
-    total+=d.worst.price-d.best.price;
+  Object.values(calculateDeals()).forEach(d=>{
+    total += (d.worst.price - d.best.price);
   });
 
-  document.getElementById("savings-badge").innerText=
-    total?`💰 Save $${total.toFixed(2)}`:"";
+  document.getElementById("savings-badge").innerText =
+    total ? `💰 You save $${total.toFixed(2)}` : "";
 }
-
-/* ALERT */
-function checkAlert(e){
-  if(e.price<5){
-    alert(`${e.name} under $5 ✅`);
-  }
-}
-
-/* shortcuts */
-const sName=()=>document.getElementById("s-name");
-const pName=()=>document.getElementById("p-name");
-const pPrice=()=>document.getElementById("p-price");
-const pStore=()=>document.getElementById("p-store");
-
 </script>
 
 </body>
