@@ -1,4 +1,24 @@
-<!DOCTYPE html>
+r
+Top badge:
+You saved $12.43 this week 💰
+
+
+✅ Price Alerts
+Milk dropped below $5.00 ✅
+
+
+👍 You’re Building Something Real
+At this point you have:
+✅ Multi-user synced app
+✅ Price intelligence system
+✅ Decision engine
+✅ Hosted live product
+
+👉 Tell me next:
+✅ “Planner works”
+✅ or “UI tweak it”
+✅ or “optimize for fewer stores”
+…and I’ll take you one level higher 👍Provide your feedback on BizChatYou said: <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -491,7 +511,60 @@ function refreshStoreSelects() {
 
   return result;
 }
+function calculateShoppingPlan() {
+  const deals = calculateBestDeals();
+  const plan = {};
 
+  Object.keys(deals).forEach(itemName => {
+    const best = deals[itemName].best;
+
+    if (!plan[best.store]) {
+      plan[best.store] = [];
+    }
+
+    plan[best.store].push(best);
+  });
+
+  return plan;
+}
+  function renderShoppingPlan() {
+  const el = document.getElementById('deals-content');
+
+  const plan = calculateShoppingPlan();
+
+  if (!Object.keys(plan).length) {
+    el.innerHTML = `
+      <div class="empty">
+        Add more items to generate a shopping plan.
+      </div>
+    `;
+    return;
+  }
+
+  let totalSavings = 0;
+
+  const deals = calculateBestDeals();
+
+  Object.values(deals).forEach(d => {
+    totalSavings += (d.worst.price - d.best.price);
+  });
+
+  el.innerHTML = `
+    <div class="card">
+      <b>🛒 Smart Shopping Plan</b><br><br>
+      ${Object.keys(plan).map(store => `
+        <b>${store}</b><br>
+        ${plan[store].map(item => `
+          • ${item.name} — $${item.price.toFixed(2)}
+        `).join('<br>')}
+        <br><br>
+      `).join('')}
+      <hr style="margin:10px 0">
+      💰 Total Savings: $${totalSavings.toFixed(2)}
+    </div>
+  `;
+}
+``
 /* ───────── RENDER BEST DEALS ───────── */
   function renderDeals() {
   const el = document.getElementById('deals-content');
@@ -505,7 +578,8 @@ function refreshStoreSelects() {
     return;
   }
 
-  const deals = calculateBestDeals();
+  renderShoppingPlan();
+  return;
 
   el.innerHTML = Object.keys(deals).map(name => {
     const d = deals[name];
@@ -542,4 +616,4 @@ document.getElementById('p-date').value =
 
 </script>
 </body>
-</html>
+</html
