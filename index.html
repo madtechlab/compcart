@@ -1,405 +1,133 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="theme-color" content="#1a472a">
-<title>MaD CompCart — Grocery Price Comparison Tracker</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Lora:wght@500;600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MaD CompCart</title>
+
 <style>
-:root {
-  --green-900: #0d2614;
-  --green-800: #1a472a;
-  --green-700: #1e5c34;
-  --green-600: #2d7a47;
-  --green-400: #4caf72;
-  --green-200: #a8dbb8;
-  --green-100: #d4eedc;
-  --green-50:  #eef8f2;
-  --amber-600: #b45309;
-  --amber-100: #fef3c7;
-  --red-600:   #c0392b;
-  --red-50:    #fef2f2;
-  --gray-900:  #111827;
-  --gray-700:  #374151;
-  --gray-500:  #6b7280;
-  --gray-300:  #d1d5db;
-  --gray-100:  #f3f4f6;
-  --gray-50:   #f9fafb;
-  --white:     #ffffff;
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 16px;
-  --shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
-  --shadow-md: 0 4px 12px rgba(0,0,0,0.10);
+body { font-family: Arial; background:#f5f5f5; margin:0; }
+.header { background:#1a472a; color:white; padding:15px; }
+.logo { font-size:20px; font-weight:bold; }
+.cards { padding:15px; }
+.card {
+  background:white;
+  padding:12px;
+  margin-bottom:10px;
+  border-radius:10px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
 }
-*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-html,body{height:100%;background:var(--gray-50);font-family:'DM Sans',sans-serif;color:var(--gray-900);font-size:16px}
-
-/* HEADER */
-.header{background:var(--green-800);padding:16px 20px 0;position:sticky;top:0;z-index:100}
-.header-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
-.logo{font-family:'Lora',serif;font-size:22px;color:var(--white);font-weight:600;letter-spacing:-0.3px}
-.logo span{color:var(--green-200)}
-.sync-badge{font-size:11px;padding:4px 10px;border-radius:20px;font-weight:500;display:flex;align-items:center;gap:5px}
-.sync-badge.live{background:rgba(76,175,114,0.25);color:var(--green-200)}
-.sync-badge.offline{background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.5)}
-.sync-dot{width:7px;height:7px;border-radius:50%}
-.sync-badge.live .sync-dot{background:var(--green-400);animation:pulse 2s infinite}
-.sync-badge.offline .sync-dot{background:rgba(255,255,255,0.3)}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
-
-/* TABS */
-.tabs{display:flex;gap:2px}
-.tab{flex:1;padding:10px 4px 11px;font-size:13px;font-weight:500;color:rgba(255,255,255,0.6);background:none;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;border-bottom:2px solid transparent;transition:all 0.15s;display:flex;flex-direction:column;align-items:center;gap:3px}
-.tab svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-.tab.active{color:var(--white);border-bottom-color:var(--green-200)}
-.tab:hover:not(.active){color:rgba(255,255,255,0.85)}
-.tab-label{font-size:11px}
-
-/* CONTENT */
-.content{padding:16px;max-width:600px;margin:0 auto}
-
-/* CARDS */
-.card{background:var(--white);border-radius:var(--radius-lg);box-shadow:var(--shadow-sm);padding:16px;margin-bottom:12px;border:1px solid var(--gray-100)}
-.card-title{font-family:'Lora',serif;font-size:16px;font-weight:600;color:var(--green-800);margin-bottom:14px}
-
-/* FORMS */
-.field{margin-bottom:12px}
-.field label{display:block;font-size:12px;font-weight:500;color:var(--gray-500);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.04em}
-input[type=text],input[type=number],input[type=date],select,textarea{width:100%;padding:11px 13px;border:1.5px solid var(--gray-300);border-radius:var(--radius-md);font-size:15px;font-family:'DM Sans',sans-serif;color:var(--gray-900);background:var(--white);appearance:none;-webkit-appearance:none;transition:border-color 0.15s}
-input:focus,select:focus,textarea:focus{outline:none;border-color:var(--green-600)}
-.row-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.row-3{display:grid;grid-template-columns:2fr 1fr 1fr;gap:10px}
-
-/* BUTTONS */
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:11px 18px;border-radius:var(--radius-md);font-size:14px;font-weight:500;font-family:'DM Sans',sans-serif;cursor:pointer;transition:all 0.15s;border:none;width:100%}
-.btn svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
-.btn-primary{background:var(--green-700);color:var(--white)}
-.btn-primary:hover{background:var(--green-800)}
-.btn-primary:active{transform:scale(0.98)}
-.btn-ghost{background:var(--gray-100);color:var(--gray-700)}
-.btn-ghost:hover{background:var(--gray-200)}
-.btn-danger{background:var(--red-50);color:var(--red-600);border:1px solid #fca5a5}
-.btn-sm{padding:7px 12px;font-size:13px;width:auto}
-
-/* BADGES */
-.badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:3px 8px;border-radius:20px}
-.badge-best{background:#dcfce7;color:#166534}
-.badge-high{background:var(--red-50);color:var(--red-600)}
-.badge-store{font-size:11px;font-weight:500;padding:3px 9px;border-radius:20px;display:inline-block}
-
-/* STORE COLORS */
-.sc-0{background:#dbeafe;color:#1e40af}
-.sc-1{background:#d1fae5;color:#065f46}
-.sc-2{background:#fef3c7;color:#92400e}
-.sc-3{background:#fce7f3;color:#9d174d}
-.sc-4{background:#ede9fe;color:#4c1d95}
-
-/* TABLE */
-.price-table{width:100%;border-collapse:collapse}
-.price-table th{font-size:11px;font-weight:600;color:var(--gray-500);text-transform:uppercase;letter-spacing:0.05em;padding:8px 10px;border-bottom:1.5px solid var(--gray-100);text-align:left}
-.price-table td{padding:10px 10px;border-bottom:1px solid var(--gray-100);font-size:14px;vertical-align:middle}
-.price-table tr:last-child td{border-bottom:none}
-.price-table tbody tr:hover td{background:var(--gray-50)}
-.price-mono{font-family:monospace;font-size:14px;font-weight:500}
-
-/* METRICS */
-.metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
-.metric{background:var(--green-50);border-radius:var(--radius-md);padding:12px 10px;text-align:center}
-.metric-val{font-family:'Lora',serif;font-size:20px;font-weight:600;color:var(--green-800)}
-.metric-lbl{font-size:11px;color:var(--green-600);margin-top:2px;font-weight:500}
-
-/* UPLOAD */
-.upload-zone{border:2px dashed var(--gray-300);border-radius:var(--radius-lg);padding:28px 16px;text-align:center;cursor:pointer;transition:all 0.15s;background:var(--gray-50)}
-.upload-zone:hover{border-color:var(--green-400);background:var(--green-50)}
-.upload-zone svg{width:36px;height:36px;stroke:var(--gray-400);fill:none;stroke-width:1.5;stroke-linecap:round;margin-bottom:10px}
-.upload-zone p{font-size:14px;color:var(--gray-500)}
-.upload-zone .hint{font-size:12px;color:var(--gray-400);margin-top:4px}
-
-/* SPINNER */
-.spinner{width:20px;height:20px;border:2.5px solid var(--gray-200);border-top-color:var(--green-600);border-radius:50%;animation:spin 0.7s linear infinite;display:inline-block}
-@keyframes spin{to{transform:rotate(360deg)}}
-
-/* IMPORT ITEM ROW */
-.import-row{display:grid;grid-template-columns:auto 1fr auto auto;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--gray-100)}
-.import-row:last-child{border-bottom:none}
-.import-row input[type=checkbox]{width:18px;height:18px;accent-color:var(--green-700);cursor:pointer;flex-shrink:0}
-.import-row input[type=text]{font-size:13px;padding:7px 10px}
-.import-row input[type=number]{width:80px;font-size:13px;padding:7px 10px;text-align:right}
-
-/* CAT HEADING */
-.cat-head{font-size:11px;font-weight:600;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.07em;padding:14px 0 6px;border-bottom:1px solid var(--gray-100);margin-bottom:4px}
-
-/* EMPTY */
-.empty{text-align:center;padding:36px 20px;color:var(--gray-400)}
-.empty svg{width:48px;height:48px;stroke:var(--gray-300);fill:none;stroke-width:1.2;stroke-linecap:round;margin-bottom:12px}
-.empty p{font-size:14px}
-
-/* SECTION HIDDEN */
-.section{display:none}.section.active{display:block}
-
-/* TOAST */
-#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--green-800);color:var(--white);padding:10px 20px;border-radius:30px;font-size:14px;font-weight:500;z-index:999;transition:transform 0.3s;pointer-events:none;white-space:nowrap}
-#toast.show{transform:translateX(-50%) translateY(0)}
-
-/* DELETE BTN */
-.del-btn{background:none;border:none;cursor:pointer;color:var(--gray-300);padding:4px;border-radius:4px;display:flex;align-items:center}
-.del-btn:hover{color:var(--red-600)}
-.del-btn svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round}
-
-/* MOBILE SAFE AREA */
-.bottom-spacer{height:24px}
+button { cursor:pointer }
+.delete { background:none; border:none; font-size:16px; }
 </style>
 </head>
+
 <body>
+
 <div class="header">
-
-  <div class="header-top">
-    <div>
-      <div class="logo">MaD-<span>CompCart</span></div>
-      <div id="savings-badge" style="color:white;font-size:12px;margin-top:4px;"></div>
-    </div>
-
-    <div class="sync-badge offline" id="sync-badge">
-      <div class="sync-dot"></div>
-      <span id="sync-label">Connecting…</span>
-    </div>
-  </div>
-
-  <div class="tabs">
-    <button class="tab active" onclick="showTab('prices')" data-tab="prices">
-      <span>Prices</span>
-    </button>
-    <button class="tab" onclick="showTab('import')" data-tab="import">
-      <span>Import</span>
-    </button>
-    <button class="tab" onclick="showTab('deals')" data-tab="deals">
-      <span>Best Deals</span>
-    </button>
-    <button class="tab" onclick="showTab('stores')" data-tab="stores">
-      <span>Stores</span>
-    </button>
-  </div>
-
+  <div class="logo">MaD-CompCart</div>
+  <div id="savings-badge"></div>
 </div>
 
-<!-- PRICES TAB -->
-<div id="tab-prices" class="section active">
-  <div class="content">
-    <div class="card">
-      <div class="card-title">Add a price</div>
-      <div class="field">
-        <label>Item name</label>
-        <input type="text" id="p-name" placeholder="e.g. Whole milk, 1 gallon">
-      </div>
-      <div class="row-2">
-        <div class="field">
-          <label>Category</label>
-          <select id="p-cat">
-            <option>Dairy</option><option>Produce</option><option>Meat &amp; Seafood</option>
-            <option>Pantry</option><option>Frozen</option><option>Bakery</option>
-            <option>Beverages</option><option>Snacks</option><option>Other</option>
-          </select>
-        </div>
-        <div class="field">
-          <label>Store</label>
-          <select id="p-store"></select>
-        </div>
-      </div>
-      <div class="row-2">
-        <div class="field">
-          <label>Price</label>
-          <input type="number" id="p-price" placeholder="0.00" step="0.01" min="0" inputmode="decimal">
-        </div>
-        <div class="field">
-          <label>Date</label>
-          <input type="date" id="p-date">
-        </div>
-      </div>
-      <button class="btn btn-primary" onclick="addEntry()">
-        <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        Add price entry
-      </button>
-    </div>
+<div class="cards">
+  <h3>Add Store</h3>
+  <input id="s-name" placeholder="Store name">
+  <button onclick="addStore()">Add</button>
 
-    <div id="prices-list"></div>
-    <div class="bottom-spacer"></div>
-  </div>
+  <h3>Add Price</h3>
+  <input id="p-name" placeholder="Item">
+  <input id="p-price" type="number" placeholder="Price">
+  <select id="p-store"></select>
+  <button onclick="addEntry()">Add</button>
+
+  <h3>Prices</h3>
+  <div id="prices-list"></div>
+
+  <h3>Stores</h3>
+  <div id="stores-list"></div>
+
+  <h3>Deals</h3>
+  <div id="deals-content"></div>
 </div>
 
-<!-- IMPORT TAB -->
-<div id="tab-import" class="section">
-  <div class="content">
-    <div class="card">
-      <div class="card-title">Import from photo or receipt</div>
-      <p style="font-size:14px;color:var(--gray-500);margin-bottom:14px">Take a photo of a product's price tag or a store receipt — AI will read the prices automatically.</p>
-      <div class="field">
-        <label>Store for these items</label>
-        <select id="i-store"></select>
-      </div>
-      <div class="upload-zone" onclick="document.getElementById('img-input').click()">
-        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-        <p>Tap to choose a photo</p>
-        <div class="hint">Price tag, shelf label, or receipt</div>
-        <input type="file" id="img-input" accept="image/*" capture="environment" style="display:none" onchange="handleImport(this)">
-      </div>
-      <div id="import-status" style="margin-top:14px"></div>
-      <div id="import-results"></div>
-    </div>
-    <div class="bottom-spacer"></div>
-  </div>
-</div>
-
-<!-- BEST DEALS TAB -->
-<div id="tab-deals" class="section">
-  <div class="content">
-    <div id="deals-content"></div>
-    <div class="bottom-spacer"></div>
-  </div>
-</div>
-
-<!-- STORES TAB -->
-<div id="tab-stores" class="section">
-  <div class="content">
-    <div class="card">
-      <div class="card-title">Add a store</div>
-      <div class="row-2">
-        <div class="field">
-          <label>Store name</label>
-          <input type="text" id="s-name" placeholder="e.g. Trader Joe's">
-        </div>
-        <div class="field">
-          <label>Location (optional)</label>
-          <input type="text" id="s-loc" placeholder="e.g. Route 59">
-        </div>
-      </div>
-      <button class="btn btn-primary" onclick="addStore()">
-        <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        Add store
-      </button>
-    </div>
-    <div id="stores-list"></div>
-    <div class="bottom-spacer"></div>
-  </div>
-</div>
-
-<div id="toast"></div>
-<script type="module">
-
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
-
-/* ✅ Firebase Config */
-const firebaseConfig = {
-  apiKey: "YOUR_KEY",
-  authDomain: "mad-compcart.firebaseapp.com",
-  databaseURL: "https://mad-compcart-default-rtdb.firebaseio.com",
-  projectId: "mad-compcart",
-  storageBucket: "mad-compcart.firebasestorage.app",
-  messagingSenderId: "630933490022",
-  appId: "1:630933490022:web:b452f6436ed2ac7f64f597"
-};
-
-const app = initializeApp(firebaseConfig);
-const dbRef = ref(getDatabase(app), 'cartsmart-family');
-
+<script>
 let db = { stores: [], entries: [] };
 
-/* ───────── SYNC ───────── */
-function pushSync() {
-  set(dbRef, db);
-}
-
-onValue(dbRef, (snapshot) => {
-  const data = snapshot.val();
-
-  if (data) {
-    db = {
-      stores: data.stores || [],
-      entries: data.entries || []
-    };
-
-    renderStores();
-    renderPrices();
-    refreshStoreSelects();
-    renderDeals();
-    updateSavingsBadge();   // ✅ NEW
-    setSyncStatus(true);
-  } else {
-    pushSync();
-  }
-});
-
-/* ───────── STATUS ───────── */
-function setSyncStatus(live) {
-  const badge = document.getElementById('sync-badge');
-  const label = document.getElementById('sync-label');
-  if (!badge) return;
-
-  badge.className = 'sync-badge ' + (live ? 'live' : 'offline');
-  label.textContent = live ? 'Synced' : 'Offline';
-}
-
 /* ───────── STORES ───────── */
-window.addStore = function () {
+function addStore() {
   const name = document.getElementById('s-name').value.trim();
-  const loc  = document.getElementById('s-loc').value.trim();
+  if (!name) return alert('Enter store');
 
-  if (!name) return alert('Enter store name');
-
-  db.stores.push({ name, loc, id: Date.now() });
-
+  db.stores.push({ name, id: Date.now() });
   document.getElementById('s-name').value = '';
-  document.getElementById('s-loc').value = '';
 
-  pushSync();
   renderStores();
   refreshStoreSelects();
-};
+}
+
+function removeStore(id) {
+  db.stores = db.stores.filter(s => s.id !== id);
+
+  renderStores();
+  refreshStoreSelects();
+  renderDeals();
+  updateSavingsBadge();
+}
 
 /* ───────── ENTRIES ───────── */
-window.addEntry = function () {
+function addEntry() {
   const name = document.getElementById('p-name').value.trim();
   const price = parseFloat(document.getElementById('p-price').value);
   const storeIndex = document.getElementById('p-store').value;
 
   if (!name || isNaN(price)) return alert('Fill fields');
+  if (!db.stores.length) return alert('Add store first');
 
-  const store = db.stores[storeIndex]?.name;
-  if (!db.entries) db.entries = [];
-  if (!store) return alert('Select a store');
+  const store = db.stores[storeIndex].name;
 
-  const entry = { name, price, store, id: Date.now() };
+  const entry = {
+    id: Date.now(),
+    name,
+    price,
+    store
+  };
 
   db.entries.push(entry);
 
-  checkPriceAlerts(entry);     // ✅ NEW ALERT
+  checkPriceAlerts(entry);
 
   document.getElementById('p-name').value = '';
   document.getElementById('p-price').value = '';
 
-  pushSync();
   renderPrices();
-  renderDeals();               // ✅ INSTANT UPDATE
-  updateSavingsBadge();        // ✅ INSTANT UPDATE
-};
+  renderDeals();
+  updateSavingsBadge();
+}
 
-/* ───────── RENDER ───────── */
+function removeEntry(id) {
+  db.entries = db.entries.filter(e => e.id !== id);
+
+  renderPrices();
+  renderDeals();
+  updateSavingsBadge();
+}
+
+/* ───────── UI ───────── */
 function renderStores() {
   const el = document.getElementById('stores-list');
 
   if (!db.stores.length) {
-    el.innerHTML = "No stores yet";
+    el.innerHTML = "No stores";
     return;
   }
 
   el.innerHTML = db.stores.map(s => `
     <div class="card">
       ${s.name}
+      <button class="delete" onclick="removeStore(${s.id})">❌</button>
     </div>
   `).join('');
 }
@@ -408,18 +136,18 @@ function renderPrices() {
   const el = document.getElementById('prices-list');
 
   if (!db.entries.length) {
-    el.innerHTML = "No prices yet";
+    el.innerHTML = "No prices";
     return;
   }
 
   el.innerHTML = db.entries.map(e => `
     <div class="card">
       ${e.name} — ${e.store} — $${e.price.toFixed(2)}
+      <button class="delete" onclick="removeEntry(${e.id})">❌</button>
     </div>
   `).join('');
 }
 
-/* ───────── STORE DROPDOWN ───────── */
 function refreshStoreSelects() {
   const el = document.getElementById('p-store');
 
@@ -428,19 +156,16 @@ function refreshStoreSelects() {
   ).join('');
 }
 
-/* ───────── DEAL LOGIC ───────── */
+/* ───────── DEALS ───────── */
 function calculateBestDeals() {
   const result = {};
 
-  db.entries.forEach(item => {
-    if (!result[item.name]) {
-      result[item.name] = { best: item, worst: item };
+  db.entries.forEach(e => {
+    if (!result[e.name]) {
+      result[e.name] = { best:e, worst:e };
     } else {
-      if (item.price < result[item.name].best.price)
-        result[item.name].best = item;
-
-      if (item.price > result[item.name].worst.price)
-        result[item.name].worst = item;
+      if (e.price < result[e.name].best.price) result[e.name].best = e;
+      if (e.price > result[e.name].worst.price) result[e.name].worst = e;
     }
   });
 
@@ -451,8 +176,8 @@ function calculateShoppingPlan() {
   const deals = calculateBestDeals();
   const plan = {};
 
-  Object.keys(deals).forEach(name => {
-    const best = deals[name].best;
+  Object.values(deals).forEach(d => {
+    const best = d.best;
 
     if (!plan[best.store]) plan[best.store] = [];
     plan[best.store].push(best);
@@ -461,97 +186,54 @@ function calculateShoppingPlan() {
   return plan;
 }
 
-/* ───────── RENDER DEALS (CLEAN) ───────── */
 function renderDeals() {
   const el = document.getElementById('deals-content');
 
   if (!db.entries.length) {
-    el.innerHTML = `
-      <div class="empty">
-        Add prices in multiple stores to see your savings here.
-      </div>
-    `;
+    el.innerHTML = "No data yet";
     return;
   }
 
-  renderShoppingPlan();
-}
-
-function renderShoppingPlan() {
-  const el = document.getElementById('deals-content');
   const plan = calculateShoppingPlan();
 
-  let totalSavings = 0;
+  let total = 0;
   Object.values(calculateBestDeals()).forEach(d => {
-    totalSavings += (d.worst.price - d.best.price);
+    total += d.worst.price - d.best.price;
   });
 
   el.innerHTML = `
-    <div class="card">
-      <b>🛒 Smart Shopping Plan</b><br><br>
+    <div class="card" style="flex-direction:column;align-items:flex-start">
+      <b>Smart Plan</b><br><br>
       ${Object.keys(plan).map(store => `
         <b>${store}</b><br>
-        ${plan[store].map(item =>
-          `• ${item.name} — $${item.price.toFixed(2)}`
-        ).join('<br>')}
+        ${plan[store].map(i => `• ${i.name} $${i.price}`).join('<br>')}
         <br><br>
       `).join('')}
-      <hr>
-      💰 Total Savings: $${totalSavings.toFixed(2)}
+      <b>Total Saved: $${total.toFixed(2)}</b>
     </div>
   `;
 }
 
-/* ───────── SAVINGS BADGE ✅ NEW ───────── */
-function calculateTotalSavings() {
+/* ───────── SAVINGS ───────── */
+function updateSavingsBadge() {
   let total = 0;
 
   Object.values(calculateBestDeals()).forEach(d => {
-    total += (d.worst.price - d.best.price);
+    total += d.worst.price - d.best.price;
   });
 
-  return total;
+  document.getElementById('savings-badge').innerText =
+    total ? `💰 Save $${total.toFixed(2)}` : "";
 }
 
-function updateSavingsBadge() {
-  const el = document.getElementById('savings-badge');
-  if (!el) return;
-
-  const savings = calculateTotalSavings();
-
-  el.textContent = savings
-    ? `💰 You save $${savings.toFixed(2)}`
-    : '';
-}
-
-/* ───────── ALERTS ✅ NEW ───────── */
+/* ───────── ALERTS ───────── */
 function checkPriceAlerts(entry) {
-  const threshold = 5;
-
-  if (entry.price < threshold) {
-    alert(`${entry.name} dropped below $${threshold}! ✅`);
+  if (entry.price < 5) {
+    alert(`${entry.name} under $5 ✅`);
   }
 }
 
-/* ───────── TABS ───────── */
-window.showTab = function(tab) {
-  document.querySelectorAll('.tab').forEach(b =>
-    b.classList.toggle('active', b.dataset.tab === tab)
-  );
-
-  document.querySelectorAll('.section').forEach(s =>
-    s.classList.remove('active')
-  );
-
-  document.getElementById('tab-' + tab).classList.add('active');
-
-  if (tab === 'deals') renderDeals();
-};
-
-/* ✅ Auto date */
-document.getElementById('p-date').value =
-  new Date().toISOString().slice(0,10);
-
 </script>
+
 </body>
 </html>
