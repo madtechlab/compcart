@@ -292,16 +292,16 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--green-60
 
 /* ───────── ADD THESE FUNCTIONS ───────── */
 
-window.removeEntry = function(id) {
+function removeEntry(id) {
   db.entries = db.entries.filter(e => e.id !== id);
 
   pushSync();
   renderPrices();
   renderDeals();
   updateSavingsBadge();
-};
+}
 
-window.removeStore = function(id) {
+function removeStore(id) {
   db.stores = db.stores.filter(s => s.id !== id);
 
   pushSync();
@@ -309,6 +309,12 @@ window.removeStore = function(id) {
   refreshStoreSelects();
   renderDeals();
   updateSavingsBadge();
+}
+
+/* ✅ CRITICAL: expose to global scope */
+window.removeEntry = removeEntry;
+window.removeStore = removeStore;
+
 };
 
 /* ───────── MODIFY renderStores ───────── */
