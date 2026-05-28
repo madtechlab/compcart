@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -7,21 +6,22 @@
 <title>MaD CompCart</title>
 
 <style>
-body { font-family: Arial; background:#f5f5f5; margin:0; }
-.header { background:#1a472a; color:white; padding:15px; }
-.logo { font-size:20px; font-weight:bold; }
-.cards { padding:15px; }
-.card {
+body{font-family:Arial;margin:0;background:#f5f5f5}
+.header{background:#1a472a;color:white;padding:15px}
+.logo{font-size:20px;font-weight:bold}
+.section{padding:15px}
+.card{
   background:white;
   padding:12px;
   margin-bottom:10px;
   border-radius:10px;
   display:flex;
   justify-content:space-between;
-  align-items:center;
+  align-items:center
 }
-button { cursor:pointer }
-.delete { background:none; border:none; font-size:16px; }
+button{cursor:pointer}
+.btn{padding:8px 12px;margin-top:5px}
+.delete{background:none;border:none;color:red;font-size:16px}
 </style>
 </head>
 
@@ -32,206 +32,204 @@ button { cursor:pointer }
   <div id="savings-badge"></div>
 </div>
 
-<div class="cards">
-  <h3>Add Store</h3>
-  <input id="s-name" placeholder="Store name">
-  <button onclick="addStore()">Add</button>
+<div class="section">
 
-  <h3>Add Price</h3>
-  <input id="p-name" placeholder="Item">
-  <input id="p-price" type="number" placeholder="Price">
-  <select id="p-store"></select>
-  <button onclick="addEntry()">Add</button>
+<h3>Add Store</h3>
+<input id="s-name" placeholder="Store name">
+<button class="btn" onclick="addStore()">Add</button>
 
-  <h3>Prices</h3>
-  <div id="prices-list"></div>
+<h3>Add Price</h3>
+<input id="p-name" placeholder="Item">
+<input id="p-price" type="number" placeholder="Price">
+<select id="p-store"></select>
+<button class="btn" onclick="addEntry()">Add</button>
 
-  <h3>Stores</h3>
-  <div id="stores-list"></div>
+<h3>Prices</h3>
+<div id="prices-list"></div>
 
-  <h3>Deals</h3>
-  <div id="deals-content"></div>
+<h3>Stores</h3>
+<div id="stores-list"></div>
+
+<h3>Deals</h3>
+<div id="deals-content"></div>
+
 </div>
 
 <script>
 let db = { stores: [], entries: [] };
 
-/* ───────── STORES ───────── */
-function addStore() {
-  const name = document.getElementById('s-name').value.trim();
-  if (!name) return alert('Enter store');
+/* STORE */
+function addStore(){
+  const name = sName().value.trim();
+  if(!name) return alert("Enter store");
 
-  db.stores.push({ name, id: Date.now() });
-  document.getElementById('s-name').value = '';
+  db.stores.push({id:Date.now(),name});
+  sName().value="";
 
   renderStores();
-  refreshStoreSelects();
+  refreshStores();
 }
 
-function removeStore(id) {
-  db.stores = db.stores.filter(s => s.id !== id);
+function removeStore(id){
+  db.stores = db.stores.filter(s=>s.id!==id);
 
   renderStores();
-  refreshStoreSelects();
+  refreshStores();
   renderDeals();
-  updateSavingsBadge();
+  updateSavings();
 }
 
-/* ───────── ENTRIES ───────── */
-function addEntry() {
-  const name = document.getElementById('p-name').value.trim();
-  const price = parseFloat(document.getElementById('p-price').value);
-  const storeIndex = document.getElementById('p-store').value;
+/* ENTRY */
+function addEntry(){
+  const name = pName().value.trim();
+  const price = parseFloat(pPrice().value);
 
-  if (!name || isNaN(price)) return alert('Fill fields');
-  if (!db.stores.length) return alert('Add store first');
+  if(!name || isNaN(price)) return alert("Fill fields");
+  if(!db.stores.length) return alert("Add store first");
 
-  const store = db.stores[storeIndex].name;
+  const store = db.stores[pStore().value].name;
 
-  const entry = {
-    id: Date.now(),
-    name,
-    price,
-    store
-  };
-
+  const entry={id:Date.now(),name,price,store};
   db.entries.push(entry);
 
-  checkPriceAlerts(entry);
+  checkAlert(entry);
 
-  document.getElementById('p-name').value = '';
-  document.getElementById('p-price').value = '';
-
-  renderPrices();
-  renderDeals();
-  updateSavingsBadge();
-}
-
-function removeEntry(id) {
-  db.entries = db.entries.filter(e => e.id !== id);
+  pName().value="";
+  pPrice().value="";
 
   renderPrices();
   renderDeals();
-  updateSavingsBadge();
+  updateSavings();
 }
 
-/* ───────── UI ───────── */
-function renderStores() {
-  const el = document.getElementById('stores-list');
+function removeEntry(id){
+  db.entries = db.entries.filter(e=>e.id!==id);
 
-  if (!db.stores.length) {
-    el.innerHTML = "No stores";
+  renderPrices();
+  renderDeals();
+  updateSavings();
+}
+
+/* UI */
+function renderStores(){
+  const el = document.getElementById("stores-list");
+
+  if(!db.stores.length){
+    el.innerHTML="No stores";
     return;
   }
 
-  el.innerHTML = db.stores.map(s => `
+  el.innerHTML = db.stores.map(s=>`
     <div class="card">
       ${s.name}
       <button class="delete" onclick="removeStore(${s.id})">❌</button>
     </div>
-  `).join('');
+  `).join("");
 }
 
-function renderPrices() {
-  const el = document.getElementById('prices-list');
+function renderPrices(){
+  const el = document.getElementById("prices-list");
 
-  if (!db.entries.length) {
-    el.innerHTML = "No prices";
+  if(!db.entries.length){
+    el.innerHTML="No prices";
     return;
   }
 
-  el.innerHTML = db.entries.map(e => `
+  el.innerHTML = db.entries.map(e=>`
     <div class="card">
       ${e.name} — ${e.store} — $${e.price.toFixed(2)}
       <button class="delete" onclick="removeEntry(${e.id})">❌</button>
     </div>
-  `).join('');
+  `).join("");
 }
 
-function refreshStoreSelects() {
-  const el = document.getElementById('p-store');
-
+function refreshStores(){
+  const el = pStore();
   el.innerHTML = db.stores.map((s,i)=>
     `<option value="${i}">${s.name}</option>`
-  ).join('');
+  ).join("");
 }
 
-/* ───────── DEALS ───────── */
-function calculateBestDeals() {
-  const result = {};
+/* DEAL LOGIC */
+function bestDeals(){
+  const map={};
 
-  db.entries.forEach(e => {
-    if (!result[e.name]) {
-      result[e.name] = { best:e, worst:e };
-    } else {
-      if (e.price < result[e.name].best.price) result[e.name].best = e;
-      if (e.price > result[e.name].worst.price) result[e.name].worst = e;
+  db.entries.forEach(e=>{
+    if(!map[e.name]) map[e.name]={best:e,worst:e};
+    else{
+      if(e.price<map[e.name].best.price) map[e.name].best=e;
+      if(e.price>map[e.name].worst.price) map[e.name].worst=e;
     }
   });
 
-  return result;
+  return map;
 }
 
-function calculateShoppingPlan() {
-  const deals = calculateBestDeals();
-  const plan = {};
+function plan(){
+  const p={};
+  const deals=bestDeals();
 
-  Object.values(deals).forEach(d => {
-    const best = d.best;
-
-    if (!plan[best.store]) plan[best.store] = [];
-    plan[best.store].push(best);
+  Object.values(deals).forEach(d=>{
+    const b=d.best;
+    if(!p[b.store]) p[b.store]=[];
+    p[b.store].push(b);
   });
 
-  return plan;
+  return p;
 }
 
-function renderDeals() {
-  const el = document.getElementById('deals-content');
+function renderDeals(){
+  const el=document.getElementById("deals-content");
 
-  if (!db.entries.length) {
-    el.innerHTML = "No data yet";
+  if(!db.entries.length){
+    el.innerHTML="No data";
     return;
   }
 
-  const plan = calculateShoppingPlan();
+  const p=plan();
+  let total=0;
 
-  let total = 0;
-  Object.values(calculateBestDeals()).forEach(d => {
-    total += d.worst.price - d.best.price;
+  Object.values(bestDeals()).forEach(d=>{
+    total+=d.worst.price-d.best.price;
   });
 
-  el.innerHTML = `
+  el.innerHTML=`
     <div class="card" style="flex-direction:column;align-items:flex-start">
       <b>Smart Plan</b><br><br>
-      ${Object.keys(plan).map(store => `
+      ${Object.keys(p).map(store=>`
         <b>${store}</b><br>
-        ${plan[store].map(i => `• ${i.name} $${i.price}`).join('<br>')}
+        ${p[store].map(i=>`• ${i.name} $${i.price}`).join("<br>")}
         <br><br>
-      `).join('')}
+      `).join("")}
       <b>Total Saved: $${total.toFixed(2)}</b>
     </div>
   `;
 }
 
-/* ───────── SAVINGS ───────── */
-function updateSavingsBadge() {
-  let total = 0;
+/* SAVINGS */
+function updateSavings(){
+  let total=0;
 
-  Object.values(calculateBestDeals()).forEach(d => {
-    total += d.worst.price - d.best.price;
+  Object.values(bestDeals()).forEach(d=>{
+    total+=d.worst.price-d.best.price;
   });
 
-  document.getElementById('savings-badge').innerText =
-    total ? `💰 Save $${total.toFixed(2)}` : "";
+  document.getElementById("savings-badge").innerText=
+    total?`💰 Save $${total.toFixed(2)}`:"";
 }
 
-/* ───────── ALERTS ───────── */
-function checkPriceAlerts(entry) {
-  if (entry.price < 5) {
-    alert(`${entry.name} under $5 ✅`);
+/* ALERT */
+function checkAlert(e){
+  if(e.price<5){
+    alert(`${e.name} under $5 ✅`);
   }
 }
+
+/* shortcuts */
+const sName=()=>document.getElementById("s-name");
+const pName=()=>document.getElementById("p-name");
+const pPrice=()=>document.getElementById("p-price");
+const pStore=()=>document.getElementById("p-store");
 
 </script>
 
