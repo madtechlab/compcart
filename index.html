@@ -419,9 +419,14 @@ function renderPrices() {
 }
 
 function refreshStoreSelects() {
-  document.getElementById('p-store').innerHTML =
-    db.stores.map((s,i)=> `<option value="${i}">${s.name}</option>`).join('');
+ const options = db.stores.map((s,i)=>
+    `<option value="${i}">${s.name}</option>`
+  ).join('');
+
+  document.getElementById('p-store').innerHTML = options;
+  document.getElementById('i-store').innerHTML = options;
 }
+
 
 /* ───────── DEALS ───────── */
 function calculateBestDeals() {
@@ -496,7 +501,7 @@ async function handleImport(input) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": "Bearer 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"
+          "Authorization": "Bearer PLACEHOLDER_KEY"
         },
         body: JSON.stringify({
           model: "gpt-4.1",
