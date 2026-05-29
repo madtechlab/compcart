@@ -477,6 +477,120 @@ function showTab(tab) {
 
   if (tab === 'deals') renderDeals();
 }
+/* ───────── AI IMPORT ───────── */
+
+async function handleImport(input) {
+  const file = input.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+
+  reader.onload = async function(e) {
+    const base64 = e.target.result.split(',')[1];
+
+    document.getElementById('import-status').innerHTML =
+      "📸 Scanning image...";
+
+    try {
+      const res = await fetch("https://api.openai.com/v1/responses", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer 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"
+        },
+        body: JSON.stringify({
+          model: "gpt-4.1",
+          input: [{
+            role: "user",
+            content: [
+              {
+                type: "input_text",
+                text: "Extract grocery items and prices. Ignore tax, totals, and non-product lines. Return ONLY JSON like [{name, price}]"
+              },
+              {
+                type: "input_image",
+                image_base64: base64
+              }
+            ]
+          }]
+        })
+      });
+
+      const data = await res.json();
+      const text = data.output[0].content[0].text;
+
+      let items;
+
+      try {
+        items = JSON.parse(text);
+      } catch {
+        document.getElementById('import-status').innerHTML =
+          "⚠️ Could not read items";
+        return;
+      }
+
+      showImportPreview(items);
+
+    } catch (err) {
+      console.error(err);
+      document.getElementById('import-status').innerHTML =
+        "❌ Scan failed";
+    }
+  };
+
+  reader.readAsDataURL(file);
+}
+
+function showImportPreview(items) {
+  const el = document.getElementById('import-results');
+
+  el.innerHTML = `
+    <div class="card">
+      <div class="card-title">Detected Items</div>
+
+      ${items.map(i => `
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+          <span>${i.name}</span>
+          <span>$${parseFloat(i.price).toFixed(2)}</span>
+        </div>
+      `).join('')}
+
+      <button class="btn btn-primary" onclick="confirmImport()">
+        Add Items
+      </button>
+    </div>
+  `;
+
+  window._importItems = items;
+}
+
+window.confirmImport = function() {
+  const storeIndex = document.getElementById('i-store').value;
+  const store = db.stores[storeIndex]?.name;
+
+  if (!store) {
+    alert("Select a store first");
+    return;
+  }
+
+  (_importItems || []).forEach(item => {
+    db.entries.push({
+      name: item.name,
+      price: parseFloat(item.price),
+      store,
+      id: Date.now() + Math.random()
+    });
+  });
+
+  pushSync();
+
+  document.getElementById('import-results').innerHTML = "";
+  document.getElementById('import-status').innerHTML =
+    "✅ Imported!";
+};
+
+/* ✅ MAKE FUNCTION AVAILABLE TO HTML */
+window.handleImport = handleImport;
 
 /* ✅ DATE */
 document.getElementById('p-date').value =
