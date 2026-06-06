@@ -823,8 +823,8 @@ async function attemptUnlock() {
   errEl.textContent = '';
 
   try {
-    // Fetch the hash from Firebase — only readable by authenticated users
-    const snap = await firebase.database().ref('access/passphraseHash').get();
+    // Fetch the hash from Firebase — stored inside cartsmart-family/access/
+    const snap = await firebase.database().ref('cartsmart-family/access/passphraseHash').get();
     const hash = snap.val();
 
     if (!hash) {
