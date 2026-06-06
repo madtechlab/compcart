@@ -19,7 +19,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <!-- bcryptjs — password hashing. SRI hash ensures the file is never tampered with. -->
 <script src="https://cdn.jsdelivr.net/npm/bcryptjs@2.4.3/dist/bcrypt.min.js"
-        integrity="sha256-+OI8a1w7aELBKYGS8pHBPJTxn7IW8tOhSqwSCDAIXMk="
+        integrity="sha256-r9S9KZvN5nEN1voCkVbj4RdMSLwAa4qeujL5ZOWSN4M="
         crossorigin="anonymous"></script>
 <style>
 :root {
@@ -727,13 +727,13 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--green-60
 <script>
 
 const firebaseConfig = {
-  apiKey: "AIzaSyCxZtaqQpj3OOibWeYTzsTSZcVtzmXqPiY",
+  apiKey: "AIzaSyCXtZaqQp3jOObiWeyTZsT52cVtzmXqPiY",
   authDomain: "mad-compcart.firebaseapp.com",
   databaseURL: "https://mad-compcart-default-rtdb.firebaseio.com",
   projectId: "mad-compcart",
   storageBucket: "mad-compcart.firebasestorage.app",
-  messagingSenderId: "630933490022",
-  appId: "1:630933490022:web:b452f6436ed2ac7f64f597"
+  messagingSenderId: "630933940022",
+  appId: "1:630933940022:web:b452f6436ed2ac7f64f597"
 };
 
 firebase.initializeApp(firebaseConfig);
@@ -1246,13 +1246,15 @@ function validateStore(name, loc) {
 function logError(context, err) {
   console.error(`[${context}]`, err);
   try {
+    const user = firebase.auth().currentUser;
+    if (!user || !navigator.onLine) return;
     firebase.database().ref('errors').push().set({
       context,
       message: err?.message || String(err),
       stack:   err?.stack   || null,
       date:    today(),
       ts:      Date.now()
-    });
+    }).catch(() => {}); // silently ignore permission_denied if /errors not in rules
   } catch(e) { /* never let error logging break the app */ }
 }
 
