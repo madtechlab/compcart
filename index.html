@@ -17,10 +17,8 @@
 <script src="https://unpkg.com/@zxing/browser@0.2.0/umd/zxing-browser.min.js"></script>
 <!-- Chart.js for price history charts -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<!-- bcryptjs — password hashing. SRI hash ensures the file is never tampered with. -->
-<script src="https://cdn.jsdelivr.net/npm/bcryptjs@2.4.3/dist/bcrypt.min.js"
-        integrity="sha256-r9S9KZvN5nEN1voCkVbj4RdMSLwAa4qeujL5ZOWSN4M="
-        crossorigin="anonymous"></script>
+<!-- bcryptjs — password hashing -->
+<script src="https://cdn.jsdelivr.net/npm/bcryptjs@2.4.3/dist/bcrypt.min.js"></script>
 <style>
 :root {
   --green-900: #0d2614;
@@ -806,6 +804,12 @@ async function attemptUnlock() {
   const btn   = document.getElementById('unlock-btn');
   const errEl = document.getElementById('unlock-error');
   const attEl = document.getElementById('unlock-attempts');
+
+  // Guard: bcryptjs must be loaded
+  if (typeof bcrypt === 'undefined') {
+    errEl.textContent = 'Security library failed to load. Please refresh the page and try again.';
+    return;
+  }
 
   const typed = input.value;
   if (!typed) { errEl.textContent = 'Enter the passphrase.'; return; }
