@@ -9,6 +9,18 @@
 <title>MaD CompCart — Grocery Price Comparison Tracker</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Lora:wght@500;600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<!-- Firebase compat SDK (no ES modules needed — works with plain onclick handlers) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<!-- ZXing barcode scanner -->
+<script src="https://unpkg.com/@zxing/browser@0.2.0/umd/zxing-browser.min.js"></script>
+<!-- Chart.js for price history charts -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<!-- bcryptjs — password hashing. SRI hash ensures the file is never tampered with. -->
+<script src="https://cdn.jsdelivr.net/npm/bcryptjs@2.4.3/dist/bcrypt.min.js"
+        integrity="sha256-+OI8a1w7aELBKYGS8pHBPJTxn7IW8tOhSqwSCDAIXMk="
+        crossorigin="anonymous"></script>
 <style>
 :root {
   --green-900: #0d2614;
@@ -35,37 +47,41 @@
   --radius-lg: 16px;
   --shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
   --shadow-md: 0 4px 12px rgba(0,0,0,0.10);
+  /* Item 7: font variables — reuse everywhere */
+  --font-body:    'DM Sans', sans-serif;
+  --font-heading: 'Lora', serif;
+  --font-mono:    monospace;
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-html,body{height:100%;background:var(--gray-50);font-family:'DM Sans',sans-serif;color:var(--gray-900);font-size:16px}
+html,body{height:100%;background:var(--gray-50);font-family:var(--font-body);color:var(--gray-900);font-size:16px}
 
 /* HEADER */
 .header{background:var(--green-800);padding:16px 20px 0;position:sticky;top:0;z-index:100}
 .header-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
-.logo{font-family:'Lora',serif;font-size:22px;color:var(--white);font-weight:600;letter-spacing:-0.3px}
+.logo{font-family:var(--font-heading);font-size:22px;color:var(--white);font-weight:600;letter-spacing:-0.3px}
 .logo span{color:var(--green-200)}
-.sync-badge{font-size:11px;padding:4px 10px;border-radius:20px;font-weight:500;display:flex;align-items:center;gap:5px}
+.sync-badge{font-size:11px;padding:4px 10px;border-radius:20px;font-weight:500;display:flex;align-items:center;gap:5px;cursor:default}
 .sync-badge.live{background:rgba(76,175,114,0.25);color:var(--green-200)}
 .sync-badge.offline{background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.5)}
-.sync-dot{width:7px;height:7px;border-radius:50%}
+.sync-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
 .sync-badge.live .sync-dot{background:var(--green-400);animation:pulse 2s infinite}
 .sync-badge.offline .sync-dot{background:rgba(255,255,255,0.3)}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+@keyframes pop{0%{transform:scale(1)}50%{transform:scale(1.03)}100%{transform:scale(1)}}
 
-/* TABS */
-.tabs{display:flex;gap:2px}
-.tab{flex:1;padding:10px 4px 11px;font-size:13px;font-weight:500;color:rgba(255,255,255,0.6);background:none;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;border-bottom:2px solid transparent;transition:all 0.15s;display:flex;flex-direction:column;align-items:center;gap:3px}
-.tab svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+/* TABS — 5 tabs so smaller */
+.tabs{display:flex;gap:1px}
+.tab{flex:1;padding:9px 2px 10px;font-size:11px;font-weight:500;color:rgba(255,255,255,0.6);background:none;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;border-bottom:2px solid transparent;transition:all 0.15s;display:flex;flex-direction:column;align-items:center;gap:2px}
 .tab.active{color:var(--white);border-bottom-color:var(--green-200)}
 .tab:hover:not(.active){color:rgba(255,255,255,0.85)}
-.tab-label{font-size:11px}
+.tab-icon{font-size:16px;line-height:1}
 
 /* CONTENT */
 .content{padding:16px;max-width:600px;margin:0 auto}
 
-/* CARDS */
+/* CARDS — no hover transform (causes jump on mobile tap) */
 .card{background:var(--white);border-radius:var(--radius-lg);box-shadow:var(--shadow-sm);padding:16px;margin-bottom:12px;border:1px solid var(--gray-100)}
-.card-title{font-family:'Lora',serif;font-size:16px;font-weight:600;color:var(--green-800);margin-bottom:14px}
+.card-title{font-family:var(--font-heading);font-size:16px;font-weight:600;color:var(--green-800);margin-bottom:14px}
 
 /* FORMS */
 .field{margin-bottom:12px}
@@ -73,11 +89,13 @@ html,body{height:100%;background:var(--gray-50);font-family:'DM Sans',sans-serif
 input[type=text],input[type=number],input[type=date],select,textarea{width:100%;padding:11px 13px;border:1.5px solid var(--gray-300);border-radius:var(--radius-md);font-size:15px;font-family:'DM Sans',sans-serif;color:var(--gray-900);background:var(--white);appearance:none;-webkit-appearance:none;transition:border-color 0.15s}
 input:focus,select:focus,textarea:focus{outline:none;border-color:var(--green-600)}
 .row-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.row-3{display:grid;grid-template-columns:2fr 1fr 1fr;gap:10px}
+
+/* FUZZY SUGGESTION */
+.fuzzy-suggestion{background:var(--amber-100);border:1px solid #fcd34d;border-radius:var(--radius-md);padding:10px 13px;font-size:13px;color:var(--amber-600);margin-bottom:10px;display:none;cursor:pointer}
+.fuzzy-suggestion b{font-weight:600}
 
 /* BUTTONS */
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:11px 18px;border-radius:var(--radius-md);font-size:14px;font-weight:500;font-family:'DM Sans',sans-serif;cursor:pointer;transition:all 0.15s;border:none;width:100%}
-.btn svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
 .btn-primary{background:var(--green-700);color:var(--white)}
 .btn-primary:hover{background:var(--green-800)}
 .btn-primary:active{transform:scale(0.98)}
@@ -85,38 +103,60 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--green-60
 .btn-ghost:hover{background:var(--gray-200)}
 .btn-danger{background:var(--red-50);color:var(--red-600);border:1px solid #fca5a5}
 .btn-sm{padding:7px 12px;font-size:13px;width:auto}
+.btn-row{display:flex;gap:8px;flex-wrap:wrap}
 
 /* BADGES */
 .badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:3px 8px;border-radius:20px}
 .badge-best{background:#dcfce7;color:#166534}
 .badge-high{background:var(--red-50);color:var(--red-600)}
 .badge-store{font-size:11px;font-weight:500;padding:3px 9px;border-radius:20px;display:inline-block}
-
-/* STORE COLORS */
 .sc-0{background:#dbeafe;color:#1e40af}
 .sc-1{background:#d1fae5;color:#065f46}
 .sc-2{background:#fef3c7;color:#92400e}
 .sc-3{background:#fce7f3;color:#9d174d}
 .sc-4{background:#ede9fe;color:#4c1d95}
 
-/* TABLE */
-.price-table{width:100%;border-collapse:collapse}
-.price-table th{font-size:11px;font-weight:600;color:var(--gray-500);text-transform:uppercase;letter-spacing:0.05em;padding:8px 10px;border-bottom:1.5px solid var(--gray-100);text-align:left}
-.price-table td{padding:10px 10px;border-bottom:1px solid var(--gray-100);font-size:14px;vertical-align:middle}
-.price-table tr:last-child td{border-bottom:none}
-.price-table tbody tr:hover td{background:var(--gray-50)}
-.price-mono{font-family:monospace;font-size:14px;font-weight:500}
+/* PRICE ENTRY CARD */
+.entry-card{background:var(--white);border:1px solid var(--gray-100);border-radius:var(--radius-md);padding:12px 14px;margin-bottom:8px;display:flex;align-items:flex-start;gap:10px}
+.entry-card.is-best{border-left:3px solid #4ade80}
+.entry-card.is-stale{opacity:0.65}
+.entry-main{flex:1;min-width:0}
+.entry-name{font-size:14px;font-weight:500;color:var(--gray-900);margin-bottom:3px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.entry-meta{font-size:12px;color:var(--gray-500);display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.entry-price{font-family:monospace;font-size:16px;font-weight:600;color:var(--gray-900);white-space:nowrap}
+.entry-actions{display:flex;gap:4px;align-items:center;flex-shrink:0}
+.icon-btn{background:none;border:none;cursor:pointer;color:var(--gray-300);padding:6px;border-radius:6px;display:flex;align-items:center;min-width:32px;min-height:32px;justify-content:center}
+.icon-btn:hover{color:var(--green-700);background:var(--green-50)}
+.icon-btn.danger:hover{color:var(--red-600);background:var(--red-50)}
+.icon-btn.success{color:var(--green-600)}
+.icon-btn svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+
+/* INLINE EDIT */
+.edit-overlay{background:var(--green-50);border:1.5px solid var(--green-400);border-radius:var(--radius-md);padding:10px 12px;margin-bottom:8px;display:none}
+.edit-overlay.open{display:block}
+.edit-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.edit-row input{flex:1;min-width:80px;padding:7px 10px;font-size:13px}
+
+/* HISTORY PANEL */
+.history-panel{background:var(--gray-50);border-radius:var(--radius-md);padding:10px;margin-top:6px;display:none}
+.history-panel.open{display:block}
+.history-row{display:flex;justify-content:space-between;font-size:12px;color:var(--gray-500);padding:3px 0;border-bottom:1px solid var(--gray-100)}
+.history-row:last-child{border-bottom:none}
+.stale-tag{font-size:10px;background:#fef3c7;color:#92400e;padding:1px 6px;border-radius:10px;font-weight:600}
+
+/* CAT HEADING */
+.cat-head{font-size:11px;font-weight:600;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.07em;padding:14px 0 6px;border-bottom:1px solid var(--gray-100);margin-bottom:8px}
 
 /* METRICS */
 .metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
 .metric{background:var(--green-50);border-radius:var(--radius-md);padding:12px 10px;text-align:center}
-.metric-val{font-family:'Lora',serif;font-size:20px;font-weight:600;color:var(--green-800)}
+.metric-val{font-family:var(--font-heading);font-size:20px;font-weight:600;color:var(--green-800)}
 .metric-lbl{font-size:11px;color:var(--green-600);margin-top:2px;font-weight:500}
 
 /* UPLOAD */
 .upload-zone{border:2px dashed var(--gray-300);border-radius:var(--radius-lg);padding:28px 16px;text-align:center;cursor:pointer;transition:all 0.15s;background:var(--gray-50)}
 .upload-zone:hover{border-color:var(--green-400);background:var(--green-50)}
-.upload-zone svg{width:36px;height:36px;stroke:var(--gray-400);fill:none;stroke-width:1.5;stroke-linecap:round;margin-bottom:10px}
+.upload-zone .uz-icon{font-size:32px;margin-bottom:8px}
 .upload-zone p{font-size:14px;color:var(--gray-500)}
 .upload-zone .hint{font-size:12px;color:var(--gray-400);margin-top:4px}
 
@@ -125,76 +165,226 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--green-60
 @keyframes spin{to{transform:rotate(360deg)}}
 
 /* IMPORT ITEM ROW */
-.import-row{display:grid;grid-template-columns:auto 1fr auto auto;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--gray-100)}
+.import-row{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--gray-100)}
 .import-row:last-child{border-bottom:none}
 .import-row input[type=checkbox]{width:18px;height:18px;accent-color:var(--green-700);cursor:pointer;flex-shrink:0}
-.import-row input[type=text]{font-size:13px;padding:7px 10px}
+.import-row input[type=text]{font-size:13px;padding:7px 10px;width:100%}
 .import-row input[type=number]{width:80px;font-size:13px;padding:7px 10px;text-align:right}
 
-/* CAT HEADING */
-.cat-head{font-size:11px;font-weight:600;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.07em;padding:14px 0 6px;border-bottom:1px solid var(--gray-100);margin-bottom:4px}
+/* SHOPPING LIST */
+.sl-item{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--white);border:1px solid var(--gray-100);border-radius:var(--radius-md);margin-bottom:8px}
+.sl-item.checked-off{opacity:0.45;text-decoration:line-through}
+.sl-item input[type=checkbox]{width:20px;height:20px;accent-color:var(--green-700);cursor:pointer;flex-shrink:0}
+.sl-item-name{flex:1;font-size:14px;font-weight:500}
+.sl-item-meta{font-size:12px;color:var(--gray-500);white-space:nowrap}
+.sl-store-section{margin-bottom:14px}
+.sl-store-header{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:var(--radius-md);margin-bottom:8px;font-weight:600;font-size:14px}
+.sl-store-total{margin-left:auto;font-family:monospace;font-size:13px}
+.sl-unknown{background:var(--gray-50);border:1px dashed var(--gray-300);border-radius:var(--radius-md);padding:10px 14px;margin-bottom:8px;font-size:13px;color:var(--gray-500)}
+.sl-savings-banner{background:var(--green-50);border:1.5px solid var(--green-200);border-radius:var(--radius-md);padding:12px 14px;margin-bottom:14px;font-size:14px;color:var(--green-800)}
+.trip-threshold{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--gray-600);margin-bottom:12px;flex-wrap:wrap}
+.trip-threshold input[type=range]{flex:1;min-width:100px;accent-color:var(--green-700)}
+
+/* DEALS */
+.deal-row{display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--gray-100)}
+.deal-row:last-child{border-bottom:none}
+.deal-item{font-size:14px;font-weight:500;flex:1}
+.deal-store{font-size:12px}
+.deal-prices{text-align:right}
+.deal-best{font-family:monospace;font-size:14px;font-weight:600;color:#166534}
+.deal-save{font-size:11px;color:var(--gray-400)}
+
+/* EXPORT/SETTINGS CARD */
+.settings-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--gray-100);font-size:14px}
+.settings-row:last-child{border-bottom:none}
+.settings-label{color:var(--gray-700);font-weight:500}
+.settings-sub{font-size:12px;color:var(--gray-400);margin-top:1px}
+
+/* SEARCH BAR */
+.search-bar{display:flex;gap:8px;align-items:center;margin-bottom:12px}
+.search-bar input{flex:1;padding:9px 13px;font-size:14px}
+.search-bar select{padding:9px 10px;font-size:13px;width:auto;flex-shrink:0}
+.filter-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.filter-chip{padding:5px 11px;border-radius:20px;font-size:12px;font-weight:500;border:1.5px solid var(--gray-200);background:var(--white);cursor:pointer;color:var(--gray-600);transition:all 0.12s}
+.filter-chip.active{background:var(--green-700);color:var(--white);border-color:var(--green-700)}
+
+/* STALE COLLAPSED */
+.stale-section{margin-bottom:8px}
+.stale-toggle{display:flex;align-items:center;gap:8px;padding:8px 12px;background:#fef3c7;border:1px solid #fde68a;border-radius:var(--radius-md);cursor:pointer;font-size:13px;color:#92400e;font-weight:500;user-select:none}
+.stale-toggle svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;transition:transform 0.2s}
+.stale-toggle.open svg{transform:rotate(180deg)}
+.stale-items{display:none;margin-top:4px}
+.stale-items.open{display:block}
+.entry-card.is-stale{border-left:3px solid #f59e0b;background:#fffbeb}
+/* Item 11: pop animation + background highlight on update */
+.entry-card.updated{animation:pop 0.35s ease-out;background:#ecfdf5!important;transition:background 1.2s ease 0.35s}
+
+/* Item 12: merge modal */
+.merge-group{background:var(--gray-50);border-radius:var(--radius-md);padding:12px;margin-bottom:12px;border:1px solid var(--gray-200)}
+.merge-group-title{font-size:12px;font-weight:600;color:var(--gray-500);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px}
+.merge-name-opt{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--gray-100);font-size:14px;cursor:pointer}
+.merge-name-opt:last-child{border-bottom:none}
+.merge-name-opt input[type=radio]{accent-color:var(--green-700);cursor:pointer}
+
+/* TREND */
+.trend-up{color:#dc2626;font-size:11px;font-weight:600}
+.trend-dn{color:#16a34a;font-size:11px;font-weight:600}
+.trend-fl{color:var(--gray-400);font-size:11px}
+.sparkline{display:inline-flex;align-items:flex-end;gap:2px;height:18px;vertical-align:middle;margin-left:4px}
+.sparkline span{width:4px;background:var(--green-400);border-radius:1px;display:inline-block;transition:height 0.2s}
+
+/* BEST CART COST */
+.cart-cost-card{background:var(--green-800);color:var(--white);border-radius:var(--radius-lg);padding:16px;margin-bottom:12px}
+.cart-cost-title{font-family:'Lora',serif;font-size:15px;font-weight:600;margin-bottom:10px;color:var(--green-100)}
+.cart-store-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.1);font-size:14px}
+.cart-store-row:last-child{border-bottom:none}
+.cart-store-name{color:var(--green-200)}
+.cart-store-total{font-family:monospace;font-weight:600;font-size:15px}
+.cart-grand{display:flex;justify-content:space-between;margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.2);font-weight:600;font-size:15px}
+
+/* CHART MODAL */
+.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:200;display:flex;align-items:flex-end;justify-content:center}
+.modal-backdrop.hidden{display:none}
+.modal-sheet{background:var(--white);border-radius:20px 20px 0 0;padding:20px 20px 32px;width:100%;max-width:600px;max-height:85vh;overflow-y:auto}
+.modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.modal-title{font-family:var(--font-heading);font-size:16px;font-weight:600;color:var(--green-800)}
+.modal-close{background:none;border:none;font-size:22px;cursor:pointer;color:var(--gray-400);padding:4px 8px;line-height:1}
+.chart-range{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}
+.chart-range button{padding:4px 12px;font-size:12px;border-radius:20px;border:1.5px solid var(--gray-200);background:var(--white);cursor:pointer;font-family:var(--font-body)}
+.chart-range button.active{background:var(--green-700);color:var(--white);border-color:var(--green-700)}
+.price-drop-banner{background:#dcfce7;border:1.5px solid #86efac;border-radius:var(--radius-md);padding:10px 14px;margin-bottom:12px;font-size:13px;color:#166534;font-weight:500}
+
+/* OFFLINE BANNER */
+#offline-banner{display:none;background:#7c3aed;color:#fff;text-align:center;font-size:13px;padding:6px 16px;font-weight:500}
+#offline-banner.show{display:block}
+
+/* TOAST */
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--green-800);color:var(--white);padding:10px 20px;border-radius:30px;font-size:14px;font-weight:500;z-index:999;transition:transform 0.3s;pointer-events:none;white-space:nowrap;max-width:90vw;text-align:center}
+#toast.show{transform:translateX(-50%) translateY(0)}
+
+/* SECTION */
+.section{display:none}.section.active{display:block}
+.bottom-spacer{height:32px}
 
 /* EMPTY */
 .empty{text-align:center;padding:36px 20px;color:var(--gray-400)}
-.empty svg{width:48px;height:48px;stroke:var(--gray-300);fill:none;stroke-width:1.2;stroke-linecap:round;margin-bottom:12px}
+.empty-icon{font-size:40px;margin-bottom:10px}
 .empty p{font-size:14px}
-
-/* SECTION HIDDEN */
-.section{display:none}.section.active{display:block}
-
-/* TOAST */
-#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--green-800);color:var(--white);padding:10px 20px;border-radius:30px;font-size:14px;font-weight:500;z-index:999;transition:transform 0.3s;pointer-events:none;white-space:nowrap}
-#toast.show{transform:translateX(-50%) translateY(0)}
-
-/* DELETE BTN */
-.del-btn{background:none;border:none;cursor:pointer;color:var(--gray-300);padding:4px;border-radius:4px;display:flex;align-items:center}
-.del-btn:hover{color:var(--red-600)}
-.del-btn svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round}
-
-/* MOBILE SAFE AREA */
-.bottom-spacer{height:24px}
+/* ── UNLOCK SCREEN ────────────────────────────────────────
+ * Shown on first visit to any new browser/device.
+ * Stored in localStorage after successful unlock so it
+ * never appears again on that device.
+ */
+#unlock-screen{
+  position:fixed;inset:0;z-index:9999;
+  background:var(--green-800);
+  display:flex;align-items:center;justify-content:center;
+  padding:24px;
+}
+#unlock-screen.hidden{display:none}
+.unlock-card{
+  background:var(--white);border-radius:var(--radius-lg);
+  padding:32px 28px;width:100%;max-width:360px;
+  box-shadow:var(--shadow-md);text-align:center;
+}
+.unlock-logo{
+  font-family:var(--font-heading);font-size:28px;
+  font-weight:600;color:var(--green-800);margin-bottom:6px;
+}
+.unlock-logo span{color:var(--green-400)}
+.unlock-sub{font-size:14px;color:var(--gray-500);margin-bottom:24px}
+.unlock-field{margin-bottom:14px;text-align:left}
+.unlock-field label{
+  display:block;font-size:12px;font-weight:500;
+  color:var(--gray-500);text-transform:uppercase;
+  letter-spacing:0.05em;margin-bottom:5px;
+}
+.unlock-field input{
+  width:100%;padding:12px 14px;border:1.5px solid var(--gray-300);
+  border-radius:var(--radius-md);font-size:16px;
+  font-family:var(--font-body);
+}
+.unlock-field input:focus{outline:none;border-color:var(--green-600)}
+.unlock-btn{
+  width:100%;padding:13px;background:var(--green-700);color:var(--white);
+  border:none;border-radius:var(--radius-md);font-size:15px;
+  font-weight:500;font-family:var(--font-body);cursor:pointer;
+  transition:background 0.15s;
+}
+.unlock-btn:hover{background:var(--green-800)}
+.unlock-btn:disabled{opacity:0.6;cursor:not-allowed}
+.unlock-error{
+  color:var(--red-600);font-size:13px;margin-top:10px;
+  min-height:18px;
+}
+.unlock-attempts{
+  font-size:12px;color:var(--gray-400);margin-top:8px;
+}
 </style>
 </head>
 <body>
-<div class="header">
 
+<!-- UNLOCK SCREEN — shown on first visit to any new browser/device -->
+<div id="unlock-screen" role="dialog" aria-modal="true" aria-label="App unlock">
+  <div class="unlock-card">
+    <div class="unlock-logo">MaD-<span>CompCart</span></div>
+    <div class="unlock-sub">Enter the passphrase to access your grocery tracker</div>
+    <div class="unlock-field">
+      <label for="unlock-input">Passphrase</label>
+      <input type="password" id="unlock-input"
+        placeholder="Enter passphrase"
+        autocomplete="current-password"
+        onkeydown="if(event.key==='Enter')attemptUnlock()">
+    </div>
+    <button class="unlock-btn" id="unlock-btn" onclick="attemptUnlock()">
+      Unlock
+    </button>
+    <div class="unlock-error" id="unlock-error" aria-live="polite"></div>
+    <div class="unlock-attempts" id="unlock-attempts"></div>
+  </div>
+</div>
+
+<div id="offline-banner">📵 Offline — changes saving locally, will sync when back online</div>
+
+<div class="header">
   <div class="header-top">
     <div>
       <div class="logo">MaD-<span>CompCart</span></div>
-      <div id="savings-badge" style="color:white;font-size:12px;margin-top:4px;"></div>
+      <div id="savings-badge" style="color:rgba(255,255,255,0.75);font-size:12px;margin-top:3px;"></div>
     </div>
-
     <div class="sync-badge offline" id="sync-badge">
       <div class="sync-dot"></div>
       <span id="sync-label">Connecting…</span>
     </div>
   </div>
-
-  <div class="tabs">
+  <div class="tabs" role="navigation" aria-label="App sections">
     <button class="tab active" onclick="showTab('prices')" data-tab="prices">
-      <span>Prices</span>
+      <span class="tab-icon">🏷️</span><span>Prices</span>
     </button>
-    <button class="tab" onclick="showTab('import')" data-tab="import">
-      <span>Import</span>
+    <button class="tab" onclick="showTab('list')" data-tab="list">
+      <span class="tab-icon">🛒</span><span>Shop</span>
     </button>
     <button class="tab" onclick="showTab('deals')" data-tab="deals">
-      <span>Best Deals</span>
+      <span class="tab-icon">⭐</span><span>Deals</span>
     </button>
-    <button class="tab" onclick="showTab('stores')" data-tab="stores">
-      <span>Stores</span>
+    <button class="tab" onclick="showTab('import')" data-tab="import">
+      <span class="tab-icon">📷</span><span>Import</span>
+    </button>
+    <button class="tab" onclick="showTab('settings')" data-tab="settings">
+      <span class="tab-icon">⚙️</span><span>Settings</span>
     </button>
   </div>
-
 </div>
 
-<!-- PRICES TAB -->
+<!-- ═══ PRICES TAB ═══ -->
 <div id="tab-prices" class="section active">
   <div class="content">
     <div class="card">
       <div class="card-title">Add a price</div>
       <div class="field">
         <label>Item name</label>
-        <input type="text" id="p-name" placeholder="e.g. Whole milk, 1 gallon">
+        <input type="text" id="p-name" placeholder="e.g. Whole milk, 1 gallon" oninput="checkFuzzy(this.value)" autocomplete="off">
+        <div class="fuzzy-suggestion" id="fuzzy-hint" onclick="acceptFuzzy()"></div>
       </div>
       <div class="row-2">
         <div class="field">
@@ -212,7 +402,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--green-60
       </div>
       <div class="row-2">
         <div class="field">
-          <label>Price</label>
+          <label>Price ($)</label>
           <input type="number" id="p-price" placeholder="0.00" step="0.01" min="0" inputmode="decimal">
         </div>
         <div class="field">
@@ -220,41 +410,67 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--green-60
           <input type="date" id="p-date">
         </div>
       </div>
-      <button class="btn btn-primary" onclick="addEntry()">
-        <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        Add price entry
-      </button>
+      <button class="btn btn-primary" id="btn-add-entry" onclick="addEntry()">+ Add price entry</button>
     </div>
-
-    <div id="prices-list"></div>
+    <div class="search-bar">
+      <input type="text" id="price-search" placeholder="🔍 Search items…" oninput="debouncedRenderPrices()" autocomplete="off">
+      <select id="price-sort" onchange="renderPrices()">
+        <option value="name">A–Z</option>
+        <option value="price-asc">Price ↑</option>
+        <option value="price-desc">Price ↓</option>
+        <option value="date">Newest</option>
+        <option value="recent">Recently changed</option>
+      </select>
+      <!-- Item 4: pricing mode toggle -->
+      <button id="pricing-mode-btn" class="btn btn-ghost btn-sm" onclick="togglePricingMode()" style="width:auto;white-space:nowrap" title="Switch between total price and unit price comparisons">$/total</button>
+    </div>
+    <div class="filter-row" id="cat-filters"></div>
+    <!-- Item 6: age filter chips -->
+    <div class="filter-row" id="age-filters">
+      <button class="filter-chip age-chip active" data-age="0"  onclick="setAgeFilter(0)">All ages</button>
+      <button class="filter-chip age-chip"        data-age="30" onclick="setAgeFilter(30)">≤ 30d</button>
+      <button class="filter-chip age-chip"        data-age="60" onclick="setAgeFilter(60)">≤ 60d</button>
+    </div>
+    <!-- Improvement 1: unit display chips -->
+    <div class="filter-row" id="unit-filters">
+      <span style="font-size:12px;color:var(--gray-400);align-self:center">Unit:</span>
+      <button class="filter-chip unit-chip active" data-unit="oz"   onclick="setUnitDisplay('oz')"  >$/oz</button>
+      <button class="filter-chip unit-chip"        data-unit="lb"   onclick="setUnitDisplay('lb')"  >$/lb</button>
+      <button class="filter-chip unit-chip"        data-unit="item" onclick="setUnitDisplay('item')">$/item</button>
+    </div>
+    <div id="prices-list" aria-live="polite" aria-label="Price entries"></div>
     <div class="bottom-spacer"></div>
   </div>
 </div>
 
-<!-- IMPORT TAB -->
-<div id="tab-import" class="section">
+<!-- ═══ SHOPPING LIST TAB ═══ -->
+<div id="tab-list" class="section">
   <div class="content">
     <div class="card">
-      <div class="card-title">Import from photo or receipt</div>
-      <p style="font-size:14px;color:var(--gray-500);margin-bottom:14px">Take a photo of a product's price tag or a store receipt — AI will read the prices automatically.</p>
-      <div class="field">
-        <label>Store for these items</label>
-        <select id="i-store"></select>
+      <div class="card-title">This week's list</div>
+      <div class="field" style="display:flex;gap:8px">
+        <input type="text" id="sl-input" placeholder="Add item…" oninput="showSlSuggestions(this.value)" autocomplete="off" style="flex:1" onkeydown="if(event.key==='Enter')addToList()">
+        <button class="btn btn-primary btn-sm" onclick="addToList()" style="width:auto;padding:11px 16px">Add</button>
       </div>
-      <div class="upload-zone" onclick="document.getElementById('img-input').click()">
-        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-        <p>Tap to choose a photo</p>
-        <div class="hint">Price tag, shelf label, or receipt</div>
-        <input type="file" id="img-input" accept="image/*" capture="environment" style="display:none" onchange="handleImport(this)">
+      <div id="sl-suggestions" style="margin-top:-6px;margin-bottom:8px"></div>
+      <div class="trip-threshold">
+        <span>Min. saving worth a separate trip:</span>
+        <input type="range" id="trip-min" min="0" max="20" step="0.5"
+        value="${localStorage.getItem('trip_min') || '3'}"
+        oninput="updateTripLabel(this.value);localStorage.setItem('trip_min',this.value);renderShoppingList()">
+        <span id="trip-label" style="font-weight:600;color:var(--green-700);min-width:36px">$3.00</span>
       </div>
-      <div id="import-status" style="margin-top:14px"></div>
-      <div id="import-results"></div>
+      <div class="btn-row">
+        <button class="btn btn-ghost btn-sm" onclick="clearChecked()">Clear checked</button>
+        <button class="btn btn-ghost btn-sm" onclick="clearAllList()">Clear all</button>
+      </div>
     </div>
+    <div id="shopping-list-content" aria-live="polite" aria-label="Shopping list"></div>
     <div class="bottom-spacer"></div>
   </div>
 </div>
 
-<!-- BEST DEALS TAB -->
+<!-- ═══ BEST DEALS TAB ═══ -->
 <div id="tab-deals" class="section">
   <div class="content">
     <div id="deals-content"></div>
@@ -262,40 +478,256 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--green-60
   </div>
 </div>
 
-<!-- STORES TAB -->
-<div id="tab-stores" class="section">
+<!-- ═══ IMPORT TAB ═══ -->
+<div id="tab-import" class="section">
   <div class="content">
+
+    <!-- MODE SWITCHER -->
+    <div style="display:flex;gap:8px;margin-bottom:12px">
+      <button class="btn btn-primary" id="mode-scan-btn" onclick="setImportMode('scan')" style="flex:1">
+        📷 Scan Barcode
+      </button>
+      <button class="btn btn-ghost" id="mode-photo-btn" onclick="setImportMode('photo')" style="flex:1">
+        🧾 Photo / Receipt
+      </button>
+    </div>
+
+    <!-- STORE SELECT (shared) -->
+    <div class="card" style="padding:12px 16px;margin-bottom:12px">
+      <div class="field" style="margin-bottom:0">
+        <label>Store for these items</label>
+        <select id="i-store"></select>
+      </div>
+    </div>
+
+    <!-- ── BARCODE SCAN PANEL ── -->
+    <div id="panel-scan" class="card">
+      <div class="card-title">Scan a barcode</div>
+      <p style="font-size:14px;color:var(--gray-500);margin-bottom:14px">
+        Point your camera at a product barcode. The app looks it up automatically — then you just enter the price.
+      </p>
+
+      <!-- Viewfinder -->
+      <div id="scan-viewfinder" style="position:relative;background:#000;border-radius:var(--radius-md);overflow:hidden;aspect-ratio:4/3;display:none">
+        <video id="scan-video" style="width:100%;height:100%;object-fit:cover" playsinline muted></video>
+        <!-- Aiming reticle -->
+        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none">
+          <div style="width:60%;height:35%;border:2.5px solid rgba(76,175,114,0.9);border-radius:8px;box-shadow:0 0 0 1000px rgba(0,0,0,0.35)"></div>
+        </div>
+        <div style="position:absolute;bottom:10px;left:0;right:0;text-align:center;color:rgba(255,255,255,0.8);font-size:12px">Align barcode within the box</div>
+        <button onclick="stopScanner()" style="position:absolute;top:10px;right:10px;background:rgba(0,0,0,0.5);border:none;color:#fff;border-radius:20px;padding:6px 12px;font-size:13px;cursor:pointer">✕ Stop</button>
+      </div>
+
+      <div id="scan-start-area">
+        <button class="btn btn-primary" onclick="startScanner()" id="scan-btn">
+          📷 Start Camera Scanner
+        </button>
+        <p style="font-size:12px;color:var(--gray-400);margin-top:8px;text-align:center">
+          Or type/paste a UPC manually:
+        </p>
+        <div style="display:flex;gap:8px;margin-top:6px">
+          <input type="text" id="manual-upc" placeholder="e.g. 041303027530" inputmode="numeric" style="flex:1">
+          <button class="btn btn-ghost btn-sm" onclick="lookupUPC(document.getElementById('manual-upc').value.trim())" style="width:auto">Look up</button>
+        </div>
+      </div>
+
+      <div id="scan-status" style="margin-top:12px"></div>
+
+      <!-- Product found panel -->
+      <div id="scan-result" style="display:none;margin-top:14px">
+        <div style="background:var(--green-50);border:1.5px solid var(--green-200);border-radius:var(--radius-md);padding:14px">
+          <div style="font-size:12px;font-weight:600;color:var(--green-600);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px">Product found</div>
+          <div style="display:flex;gap:10px;align-items:flex-start">
+            <img id="scan-thumb" src="" alt="" style="width:56px;height:56px;object-fit:contain;border-radius:6px;background:#fff;border:1px solid var(--gray-100);display:none;flex-shrink:0">
+            <div style="flex:1;min-width:0">
+              <div id="scan-product-name" style="font-size:15px;font-weight:600;color:var(--gray-900);margin-bottom:2px"></div>
+              <div id="scan-product-brand" style="font-size:12px;color:var(--gray-500)"></div>
+              <div id="scan-product-size" style="font-size:12px;color:var(--gray-500)"></div>
+            </div>
+          </div>
+
+          <!-- Editable fields -->
+          <div style="margin-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div class="field" style="margin-bottom:0">
+              <label>Item name</label>
+              <input type="text" id="scan-name-input" placeholder="Name">
+            </div>
+            <div class="field" style="margin-bottom:0">
+              <label>Category</label>
+              <select id="scan-cat-input">
+                <option>Dairy</option><option>Produce</option><option>Meat &amp; Seafood</option>
+                <option>Pantry</option><option>Frozen</option><option>Bakery</option>
+                <option>Beverages</option><option>Snacks</option><option>Other</option>
+              </select>
+            </div>
+          </div>
+          <div class="field" style="margin-top:10px;margin-bottom:0">
+            <label>Price you see on the shelf ($)</label>
+            <input type="number" id="scan-price-input" placeholder="0.00" step="0.01" min="0" inputmode="decimal" style="font-size:18px;font-weight:600">
+          </div>
+          <div style="display:flex;gap:8px;margin-top:12px">
+            <button class="btn btn-primary" onclick="addScannedItem()" style="flex:2">+ Add to prices</button>
+            <button class="btn btn-ghost" onclick="scanAnother()" style="flex:1">Scan another</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Not found panel -->
+      <div id="scan-notfound" style="display:none;margin-top:14px">
+        <div style="background:var(--amber-100);border:1px solid #fcd34d;border-radius:var(--radius-md);padding:14px;font-size:14px;color:var(--amber-600)">
+          <b>Product not found in database.</b><br>
+          <span style="font-size:13px">Enter the name manually below and add the price.</span>
+          <div style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <div class="field" style="margin-bottom:0">
+              <label>Item name</label>
+              <input type="text" id="nf-name-input" placeholder="e.g. Organic PB 16oz">
+            </div>
+            <div class="field" style="margin-bottom:0">
+              <label>Category</label>
+              <select id="nf-cat-input">
+                <option>Dairy</option><option>Produce</option><option>Meat &amp; Seafood</option>
+                <option>Pantry</option><option>Frozen</option><option>Bakery</option>
+                <option>Beverages</option><option>Snacks</option><option>Other</option>
+              </select>
+            </div>
+          </div>
+          <div class="field" style="margin-top:8px;margin-bottom:0">
+            <label>Price ($)</label>
+            <input type="number" id="nf-price-input" placeholder="0.00" step="0.01" min="0" inputmode="decimal">
+          </div>
+          <button class="btn btn-primary" onclick="addNotFoundItem()" style="margin-top:10px">+ Add to prices</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── PHOTO / RECEIPT PANEL ── -->
+    <div id="panel-photo" class="card" style="display:none">
+      <div class="card-title">Import from photo or receipt</div>
+      <p style="font-size:14px;color:var(--gray-500);margin-bottom:14px">Tap to photograph a price tag, shelf label, or receipt. AI reads the prices automatically.</p>
+      <div class="upload-zone" onclick="document.getElementById('img-input').click()">
+        <div class="uz-icon">📸</div>
+        <p>Tap to choose a photo</p>
+        <div class="hint">Price tag, shelf label, or receipt</div>
+        <input type="file" id="img-input" accept="image/*" capture="environment" style="display:none" onchange="handleImport(this)">
+      </div>
+      <div id="import-status" style="margin-top:14px"></div>
+      <div id="import-results"></div>
+    </div>
+
+  </div>
+  <div class="bottom-spacer"></div>
+</div>
+
+<!-- ═══ SETTINGS TAB ═══ -->
+<div id="tab-settings" class="section">
+  <div class="content">
+
     <div class="card">
-      <div class="card-title">Add a store</div>
-      <div class="row-2">
-        <div class="field">
+      <div class="card-title">Stores</div>
+      <div class="row-2" style="margin-bottom:10px">
+        <div class="field" style="margin-bottom:0">
           <label>Store name</label>
           <input type="text" id="s-name" placeholder="e.g. Trader Joe's">
         </div>
-        <div class="field">
+        <div class="field" style="margin-bottom:0">
           <label>Location (optional)</label>
           <input type="text" id="s-loc" placeholder="e.g. Route 59">
         </div>
       </div>
-      <button class="btn btn-primary" onclick="addStore()">
-        <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        Add store
-      </button>
+      <button class="btn btn-primary btn-sm" onclick="addStore()" style="width:auto">+ Add store</button>
+      <div id="stores-list" style="margin-top:12px"></div>
     </div>
-    <div id="stores-list"></div>
+
+    <div class="card">
+      <div class="card-title">Data</div>
+      <div class="settings-row">
+        <div>
+          <div class="settings-label">Export data</div>
+          <div class="settings-sub">Download all prices as a JSON backup</div>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="exportData()">Export JSON</button>
+      </div>
+      <div class="settings-row">
+        <div>
+          <div class="settings-label">Export as CSV</div>
+          <div class="settings-sub">Open in Excel or Google Sheets</div>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="exportCSV()">Export CSV</button>
+      </div>
+      <div class="settings-row">
+        <div>
+          <div class="settings-label">Import backup</div>
+          <div class="settings-sub">Restore from a previously exported JSON file</div>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('json-import').click()">Import JSON</button>
+        <input type="file" id="json-import" accept=".json" style="display:none" onchange="importBackup(this)">
+      </div>
+      <div class="settings-row">
+        <div>
+          <div class="settings-label">Find &amp; merge duplicates</div>
+          <div class="settings-sub">Detect similar item names and merge them into one</div>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="openMergeModal()">Find duplicates</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">About</div>
+      <div style="font-size:13px;color:var(--gray-500);line-height:1.6">
+        <b>MaD-CompCart</b> — grocery price tracker.<br>
+        Prices sync in real time via Firebase.<br>
+        Stale prices are flagged after <b>60 days</b>.
+      </div>
+    </div>
+
     <div class="bottom-spacer"></div>
   </div>
 </div>
 
-<div id="toast"></div>
+<!-- PRICE HISTORY CHART MODAL -->
+<div class="modal-backdrop hidden" id="chart-modal" onclick="closeChartModal(event)">
+  <div class="modal-sheet" role="dialog" aria-modal="true" aria-labelledby="chart-modal-title">
+    <div class="modal-header">
+      <div class="modal-title" id="chart-modal-title">Price History</div>
+      <button class="modal-close" onclick="closeChartModal()">✕</button>
+    </div>
+    <div id="chart-drop-banner" class="price-drop-banner" style="display:none"></div>
+    <div class="chart-range" id="chart-range">
+      <button onclick="setChartRange(30)"  class="active" data-range="30">30d</button>
+      <button onclick="setChartRange(90)"  data-range="90">90d</button>
+      <button onclick="setChartRange(365)" data-range="365">1yr</button>
+      <button onclick="setChartRange(0)"   data-range="0">All</button>
+    </div>
+    <div style="position:relative;height:220px">
+      <canvas id="price-chart"></canvas>
+    </div>
+    <div id="chart-stats" style="margin-top:14px;display:grid;grid-template-columns:repeat(3,1fr);gap:8px;font-size:13px;text-align:center"></div>
+  </div>
+</div>
 
-<script type="module">
+<!-- DUPLICATE MERGE MODAL — must be a sibling of chart modal, NOT nested inside it -->
+<div class="modal-backdrop hidden" id="merge-modal" onclick="closeMergeModal(event)">
+  <div class="modal-sheet" role="dialog" aria-modal="true" aria-label="Find and merge duplicate items">
+    <div class="modal-header">
+      <div class="modal-title">Find &amp; merge duplicates</div>
+      <button class="modal-close" onclick="closeMergeModal()">✕</button>
+    </div>
+    <p style="font-size:13px;color:var(--gray-500);margin-bottom:14px">
+      These item names look similar. Select the canonical name to merge into, then tap Merge.
+    </p>
+    <div id="merge-groups"></div>
+    <div id="merge-none" style="display:none;text-align:center;padding:24px;color:var(--gray-400);font-size:14px">
+      ✅ No duplicate item names detected.
+    </div>
+  </div>
+</div>
 
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+<div id="toast" role="alert" aria-live="polite" aria-atomic="true"></div>
+
+<script>
 
 const firebaseConfig = {
-  apiKey: "YOUR_KEY",
+  apiKey: "AIzaSyCxZtaqQpj3OOibWeYTzsTSZcVtzmXqPiY",
   authDomain: "mad-compcart.firebaseapp.com",
   databaseURL: "https://mad-compcart-default-rtdb.firebaseio.com",
   projectId: "mad-compcart",
@@ -304,308 +736,2444 @@ const firebaseConfig = {
   appId: "1:630933490022:web:b452f6436ed2ac7f64f597"
 };
 
-const app = initializeApp(firebaseConfig);
-const dbRef = ref(getDatabase(app), 'cartsmart-family');
+firebase.initializeApp(firebaseConfig);
+const dbRef = firebase.database().ref('cartsmart-family');
 
-let db = { stores: [], entries: [] };
+/*
+ * ── PASSPHRASE AUTH FLOW ──────────────────────────────────
+ *
+ * On every page load:
+ *   1. Sign in anonymously (silent — just gets a Firebase auth token)
+ *   2. Check localStorage for 'cc_unlocked' flag
+ *   3. If flag present → hide unlock screen, start DB sync
+ *   4. If flag absent  → show unlock screen, wait for passphrase
+ *
+ * On passphrase entry:
+ *   1. Fetch the bcrypt hash stored at /access/passphraseHash in Firebase
+ *   2. bcrypt.compare(typed passphrase, stored hash)
+ *   3. If match → set localStorage flag, hide screen, start DB sync
+ *   4. If no match → increment attempt counter, lock out after 5 attempts
+ *
+ * The passphrase itself never appears in this file.
+ * The hash stored in Firebase cannot be reversed to recover the passphrase.
+ * A new device just needs to know the passphrase — no rule changes needed.
+ */
 
-/* ✅ GLOBAL FUNCTIONS (FIXES BUTTONS + TABS) */
-window.showTab = showTab;
-window.addEntry = addEntry;
-window.addStore = addStore;
-window.removeEntry = removeEntry;
-window.removeStore = removeStore;
+const ACCESS_KEY       = 'cc_unlocked';   // localStorage flag
+const MAX_ATTEMPTS     = 5;
+const LOCKOUT_MS       = 5 * 60 * 1000;  // 5 minute lockout after MAX_ATTEMPTS
+const LOCKOUT_KEY      = 'cc_lockout';
+let   _unlockAttempts  = 0;
 
-/* ───────── DELETE FUNCTIONS ───────── */
-function removeEntry(id) {
-  db.entries = db.entries.filter(e => e.id !== id);
-  pushSync();
-}
-
-function removeStore(id) {
-  db.stores = db.stores.filter(s => s.id !== id);
-  pushSync();
-}
-
-/* ───────── SYNC ───────── */
-function pushSync() {
-  set(dbRef, db);
-}
-
-onValue(dbRef, (snapshot) => {
-  const data = snapshot.val();
-
-  if (data) {
-    db = {
-      stores: data.stores || [],
-      entries: data.entries || []
-    };
-
-    renderStores();
-    renderPrices();
-    refreshStoreSelects();
-    renderDeals();
-    updateSavingsBadge();
-    setSyncStatus(true);
+// Step 1: always sign in anonymously first (required for any Firebase read)
+firebase.auth().onAuthStateChanged(user => {
+  if (user) {
+    checkUnlockState();
   } else {
-    pushSync();
+    firebase.auth().signInAnonymously().catch(err => {
+      logError('signInAnonymously', err);
+      document.getElementById('unlock-error').textContent =
+        'Connection error. Please refresh and try again.';
+    });
   }
 });
 
-/* ───────── STATUS ───────── */
+function checkUnlockState() {
+  // Check for active lockout first
+  const lockoutUntil = parseInt(localStorage.getItem(LOCKOUT_KEY) || '0');
+  if (Date.now() < lockoutUntil) {
+    const mins = Math.ceil((lockoutUntil - Date.now()) / 60000);
+    document.getElementById('unlock-error').textContent =
+      `Too many attempts. Try again in ${mins} minute${mins !== 1 ? 's' : ''}.`;
+    document.getElementById('unlock-btn').disabled = true;
+    document.getElementById('unlock-input').disabled = true;
+    setTimeout(checkUnlockState, 10000); // re-check every 10s
+    return;
+  }
+
+  // Already unlocked on this device?
+  if (localStorage.getItem(ACCESS_KEY) === 'true') {
+    hideUnlockScreen();
+    startDatabaseSync();
+  } else {
+    // Show unlock screen — focus input for fast entry
+    setTimeout(() => document.getElementById('unlock-input')?.focus(), 100);
+  }
+}
+
+async function attemptUnlock() {
+  const input = document.getElementById('unlock-input');
+  const btn   = document.getElementById('unlock-btn');
+  const errEl = document.getElementById('unlock-error');
+  const attEl = document.getElementById('unlock-attempts');
+
+  const typed = input.value;
+  if (!typed) { errEl.textContent = 'Enter the passphrase.'; return; }
+
+  // Check lockout
+  const lockoutUntil = parseInt(localStorage.getItem(LOCKOUT_KEY) || '0');
+  if (Date.now() < lockoutUntil) {
+    const mins = Math.ceil((lockoutUntil - Date.now()) / 60000);
+    errEl.textContent = `Locked out. Try again in ${mins} minute${mins !== 1 ? 's' : ''}.`;
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Checking…';
+  errEl.textContent = '';
+
+  try {
+    // Fetch the hash from Firebase — only readable by authenticated users
+    const snap = await firebase.database().ref('access/passphraseHash').get();
+    const hash = snap.val();
+
+    if (!hash) {
+      // No hash stored yet — this is first-time setup
+      errEl.textContent = 'Passphrase not set up yet. See setup instructions.';
+      btn.disabled = false;
+      btn.textContent = 'Unlock';
+      return;
+    }
+
+    // bcrypt.compare is async and timing-safe
+    const match = await bcrypt.compare(typed, hash);
+
+    if (match) {
+      localStorage.setItem(ACCESS_KEY, 'true');
+      localStorage.removeItem(LOCKOUT_KEY);
+      _unlockAttempts = 0;
+      hideUnlockScreen();
+      startDatabaseSync();
+    } else {
+      _unlockAttempts++;
+      input.value = '';
+      input.focus();
+
+      if (_unlockAttempts >= MAX_ATTEMPTS) {
+        localStorage.setItem(LOCKOUT_KEY, String(Date.now() + LOCKOUT_MS));
+        errEl.textContent = 'Too many incorrect attempts. Locked for 5 minutes.';
+        btn.disabled = true;
+        input.disabled = true;
+      } else {
+        const remaining = MAX_ATTEMPTS - _unlockAttempts;
+        errEl.textContent = 'Incorrect passphrase.';
+        attEl.textContent = `${remaining} attempt${remaining !== 1 ? 's' : ''} remaining`;
+        btn.disabled = false;
+        btn.textContent = 'Unlock';
+      }
+    }
+  } catch(err) {
+    logError('attemptUnlock', err);
+    errEl.textContent = 'Error checking passphrase. Please try again.';
+    btn.disabled = false;
+    btn.textContent = 'Unlock';
+  }
+}
+window.attemptUnlock = attemptUnlock;
+
+function hideUnlockScreen() {
+  document.getElementById('unlock-screen').classList.add('hidden');
+}
+
+// Allow re-locking (useful for testing — call lockApp() from console)
+window.lockApp = function() {
+  localStorage.removeItem(ACCESS_KEY);
+  location.reload();
+};
+
+/* ── STATE ────────────────────────────────────────────── */
+let db           = { stores: [], entries: [], shoppingList: [] };
+let shoppingList = [];
+let lastSyncTime  = null;
+let _lastStore    = '';
+let _pendingSync  = false;
+let _syncTimer    = null;
+let _activeFilter = 'All';
+let _ageFilter    = 0;
+let _cache        = null;
+let _pricingMode  = localStorage.getItem('pricing_mode') || 'total';
+let _lastCat      = localStorage.getItem('last_cat')     || 'Dairy';
+// These must be here — used in renderPrices/debouncedRenderPrices which
+// fire early via refreshAll(). Declaring them late causes a temporal dead zone crash.
+let _unitDisplay  = localStorage.getItem('unit_display') || 'oz';
+let _searchTimer  = null;
+
+/* ── SCHEMA VERSION ───────────────────────────────────────
+ * Must be declared BEFORE localLoad() which calls runMigrations().
+ * const declarations are not hoisted — order matters here.
+ * Increment CURRENT_SCHEMA_VERSION whenever the data model changes.
+ * Version history:
+ *   1 — baseline
+ *   2 — entries gained storeId (name → id reference)
+ */
+const CURRENT_SCHEMA_VERSION = 2;
+
+function runMigrations(data) {
+  const v = data._schemaVersion || 0;
+  if (v < 2) {
+    // v1→v2: backfill storeId on entries that only have store name
+    (data.entries || []).forEach(e => {
+      if (!e.storeId && e.store) {
+        const s = (data.stores || []).find(s => s.name === e.store);
+        if (s) e.storeId = s.id;
+      }
+    });
+  }
+  data._schemaVersion = CURRENT_SCHEMA_VERSION;
+  return data;
+}
+
+/* ── OFFLINE-FIRST SYNC ───────────────────────────────── */
+function localSave() {
+  try { localStorage.setItem('cc_db', JSON.stringify(db)); } catch(e) { console.warn('localStorage write failed', e); }
+}
+
+function localLoad() {
+  try {
+    const raw = localStorage.getItem('cc_db');
+    if (raw) {
+      let parsed = JSON.parse(raw);
+      parsed = runMigrations(parsed);
+      db           = { stores: parsed.stores || [], entries: parsed.entries || [], shoppingList: parsed.shoppingList || [] };
+      db._schemaVersion = CURRENT_SCHEMA_VERSION;
+      shoppingList = db.shoppingList;
+      const oldList = localStorage.getItem('cc_shopping_list');
+      if (oldList && !shoppingList.length) {
+        try { shoppingList = JSON.parse(oldList); db.shoppingList = shoppingList; } catch(e) {}
+      }
+    }
+  } catch(e) { logError('localLoad', e); }
+}
+
+function pushSync() {
+  db.shoppingList = shoppingList;
+  localSave();
+  // Don't attempt Firebase write until authenticated
+  if (!firebase.auth().currentUser) { _pendingSync = true; return; }
+  if (!navigator.onLine) {
+    _pendingSync = true;
+    showOfflineBanner(true);
+    return;
+  }
+  clearTimeout(_syncTimer);
+  _syncTimer = setTimeout(() => {
+    dbRef.update({
+      stores:          db.stores,
+      entries:         db.entries,
+      shoppingList:    db.shoppingList,
+      _schemaVersion:  CURRENT_SCHEMA_VERSION
+    }).catch(err => { _pendingSync = true; logError('pushSync', err); });
+  }, 300);
+}
+
+window.addEventListener('online', () => {
+  showOfflineBanner(false);
+  if (_pendingSync && firebase.auth().currentUser) {
+    _pendingSync = false;
+    dbRef.update({
+      stores:          db.stores,
+      entries:         db.entries,
+      shoppingList:    db.shoppingList,
+      _schemaVersion:  CURRENT_SCHEMA_VERSION
+    }).then(() => toast('Synced after reconnect ✓')).catch(() => {});
+  }
+});
+
+window.addEventListener('offline', () => showOfflineBanner(true));
+
+function showOfflineBanner(show) {
+  document.getElementById('offline-banner').classList.toggle('show', show);
+  setSyncStatus(!show);
+}
+
+/*
+ * startDatabaseSync — called only after anonymous auth succeeds.
+ * Everything that touches the database lives here.
+ */
+function startDatabaseSync() {
+  // Seed from localStorage immediately so app is usable before Firebase responds
+  localLoad();
+  refreshAll();
+
+  dbRef.on('value', snapshot => {
+    const data = snapshot.val();
+    if (data) {
+      if (_pendingSync) {
+        _pendingSync = false;
+        dbRef.update({
+          stores:          db.stores,
+          entries:         db.entries,
+          shoppingList:    db.shoppingList,
+          _schemaVersion:  CURRENT_SCHEMA_VERSION
+        });
+      } else {
+        let incoming = {
+          stores:       data.stores       || [],
+          entries:      data.entries      || [],
+          shoppingList: data.shoppingList || []
+        };
+        incoming = runMigrations(incoming);
+        db           = incoming;
+        shoppingList = db.shoppingList;
+        localSave();
+        if ((data._schemaVersion || 0) < CURRENT_SCHEMA_VERSION) pushSync();
+      }
+    } else {
+      pushSync();
+    }
+    invalidateCache();
+    lastSyncTime = new Date();
+    setSyncStatus(true);
+    showOfflineBanner(false);
+    refreshAll();
+  }, err => {
+    logError('firebase.onValue', err);
+    const label = document.getElementById('sync-label');
+    if (label) label.textContent = 'DB error — check rules';
+    const badge = document.getElementById('sync-badge');
+    if (badge) badge.className = 'sync-badge offline';
+    setSyncStatus(false);
+  });
+}
+
 function setSyncStatus(live) {
   const badge = document.getElementById('sync-badge');
   const label = document.getElementById('sync-label');
-
   badge.className = 'sync-badge ' + (live ? 'live' : 'offline');
-  label.textContent = live ? 'Synced' : 'Connecting…';
+  if (live) {
+    label.textContent = lastSyncTime ? ('Synced ' + timeSince(lastSyncTime)) : 'Live';
+    clearTimeout(window._syncTimer);
+    window._syncTimer = setTimeout(() => setSyncStatus(true), 30000);
+  } else {
+    label.textContent = 'Offline — saving locally';
+  }
 }
 
-/* ───────── STORES ───────── */
+function timeSince(date) {
+  const sec = Math.floor((new Date() - date) / 1000);
+  if (sec < 10)  return 'just now';
+  if (sec < 60)  return sec + 's ago';
+  const min = Math.floor(sec / 60);
+  if (min < 60)  return min + 'm ago';
+  return Math.floor(min / 60) + 'h ago';
+}
+
+function refreshAll() {
+  refreshStoreSelects();
+  const active = document.querySelector('.tab.active')?.dataset.tab;
+  if (active === 'prices')   renderPrices();
+  if (active === 'deals')    renderDeals();
+  if (active === 'settings') renderStores();
+  if (active === 'list')     renderShoppingList();
+  updateSavingsBadge();
+  applyAccessibility();
+}
+
+/*
+ * Accessibility (item 11): post-render pass that adds ARIA labels to
+ * icon-only buttons that don't have visible text. Runs after every render
+ * so dynamically-created buttons are always covered.
+ */
+function applyAccessibility() {
+  // Icon buttons with title attributes — promote title to aria-label
+  document.querySelectorAll('.icon-btn[title]').forEach(btn => {
+    if (!btn.getAttribute('aria-label')) btn.setAttribute('aria-label', btn.title);
+  });
+  // Tab buttons
+  document.querySelectorAll('.tab').forEach(btn => {
+    const tab = btn.dataset.tab;
+    if (tab) btn.setAttribute('aria-label', `${tab} tab`);
+  });
+  // Modal close buttons
+  document.querySelectorAll('.modal-close').forEach(btn => {
+    btn.setAttribute('aria-label', 'Close dialog');
+  });
+  // Sync badge
+  const badge = document.getElementById('sync-badge');
+  if (badge) badge.setAttribute('role', 'status');
+}
+
+// Accessibility: trap focus inside open modals and close on Escape
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    const chartOpen = !document.getElementById('chart-modal')?.classList.contains('hidden');
+    const mergeOpen = !document.getElementById('merge-modal')?.classList.contains('hidden');
+    if (chartOpen) closeChartModal();
+    if (mergeOpen) closeMergeModal();
+  }
+});
+
+/*
+ * Item 1: updateDB — central state mutation function.
+ * All writes to db go through here so cache invalidation
+ * and sync always happen together, never accidentally skipped.
+ *
+ * Usage:
+ *   updateDB(db => { db.entries.push(newEntry); });
+ *   updateDB(db => { db.stores = db.stores.filter(...); });
+ */
+function updateDB(fn) {
+  fn(db);
+  shoppingList = db.shoppingList || shoppingList; // keep mirror in sync
+  invalidateCache();
+  pushSync();
+}
+
+/* ── STORES ───────────────────────────────────────────── */
 function addStore() {
   const name = document.getElementById('s-name').value.trim();
   const loc  = document.getElementById('s-loc').value.trim();
 
-  if (!name) return alert('Enter store name');
+  const v = validateStore(name, loc);
+  if (!v.ok) return toast(v.error);
 
-  db.stores.push({ name, loc, id: Date.now() });
-
+  if (db.stores.find(s => s.name.toLowerCase() === name.toLowerCase()))
+    return toast('Store already exists');
+  updateDB(db => db.stores.push({ name, loc, id: Date.now() }));
   document.getElementById('s-name').value = '';
-  document.getElementById('s-loc').value = '';
-
-  pushSync();
+  document.getElementById('s-loc').value  = '';
+  toast(name + ' added!');
 }
 
-/* ───────── ENTRIES ───────── */
-function addEntry() {
-  const name = document.getElementById('p-name').value.trim();
-  const price = parseFloat(document.getElementById('p-price').value);
-  const storeIndex = document.getElementById('p-store').value;
-
-  if (!name || isNaN(price)) return alert('Fill fields');
-
-  const store = db.stores[storeIndex]?.name;
-  if (!store) return alert('Select a store');
-
-  db.entries.push({ name, price, store, id: Date.now() });
-
-  document.getElementById('p-name').value = '';
-  document.getElementById('p-price').value = '';
-
-  pushSync();
+function removeStore(id) {
+  const s = db.stores.find(x => x.id === id);
+  if (!s) return;
+  if (!confirm(`Remove "${s.name}"?\nAll its price entries will also be removed.`)) return;
+  updateDB(db => {
+    db.stores  = db.stores.filter(x => x.id !== id);
+    // Fix 2: filter by storeId (canonical) with name fallback for legacy entries
+    db.entries = db.entries.filter(e => e.storeId ? e.storeId !== id : e.store !== s.name);
+  });
 }
 
-/* ───────── RENDER (WITH DELETE BUTTONS) ───────── */
+// Fix 2: resolve display name from storeId, with fallback for legacy entries
+function storeName(entry) {
+  if (entry.storeId) {
+    const s = db.stores.find(s => s.id === entry.storeId);
+    if (s) return s.name;
+  }
+  return entry.store || '—';
+}
+
 function renderStores() {
   const el = document.getElementById('stores-list');
-
-  el.innerHTML = db.stores.map(s => `
-    <div class="card" style="display:flex;justify-content:space-between;">
-      <div>${s.name}</div>
-      <button class="del-btn" onclick="removeStore(${s.id})">✖</button>
-    </div>
-  `).join('');
-}
-
-function renderPrices() {
-  const el = document.getElementById('prices-list');
-
-  el.innerHTML = db.entries.map(e => `
-    <div class="card" style="display:flex;justify-content:space-between;">
-      <div>${e.name} — ${e.store} — $${e.price.toFixed(2)}</div>
-      <button class="del-btn" onclick="removeEntry(${e.id})">✖</button>
-    </div>
-  `).join('');
+  if (!db.stores.length) { el.innerHTML = '<div style="font-size:14px;color:var(--gray-400)">No stores yet.</div>'; return; }
+  el.innerHTML = db.stores.map((s, i) => `
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--gray-100)">
+      <span class="badge-store sc-${i % 5}">${escapeHtml(s.name)}</span>
+      <span style="font-size:13px;color:var(--gray-400);flex:1">${escapeHtml(s.loc || '')}</span>
+      <span style="font-size:12px;color:var(--gray-400)">${db.entries.filter(e => e.storeId ? e.storeId === s.id : e.store === s.name).length} prices</span>
+      <button class="icon-btn danger" onclick="removeStore(${s.id})" title="Remove store">
+        <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6M10 11v6M14 11v6"/></svg>
+      </button>
+    </div>`).join('');
 }
 
 function refreshStoreSelects() {
- 
-const options = db.stores.map((s,i)=>
-    `<option value="${i}">${s.name}</option>`
-  ).join('');
+  // Item 4: restore persisted last store across page reloads
+  if (!_lastStore) _lastStore = localStorage.getItem('last_store') || '';
 
-  document.getElementById('p-store').innerHTML = options;
+  const opts = db.stores.length
+    ? db.stores.map((s,i) => `<option value="${i}">${s.name}</option>`).join('')
+    : '<option value="">— add a store first —</option>';
+  ['p-store','i-store'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.innerHTML = opts;
+    if (_lastStore) {
+      const idx = db.stores.findIndex(s => s.name === _lastStore);
+      if (idx >= 0) el.value = String(idx);
+    }
+  });
 
-  const importSelect = document.getElementById('i-store');
-  if (importSelect) {
-    importSelect.innerHTML = options;
+  // Item 10: restore last-used category
+  const catEl = document.getElementById('p-cat');
+  if (catEl && _lastCat) {
+    for (let i = 0; i < catEl.options.length; i++) {
+      if (catEl.options[i].value === _lastCat) { catEl.selectedIndex = i; break; }
+    }
   }
 }
 
+/* ── HELPERS ──────────────────────────────────────────── */
+function today() { return new Date().toISOString().slice(0,10); }
 
+// Fix 6: collision-safe ID using crypto.randomUUID() where available
+function newId() {
+  return (typeof crypto !== 'undefined' && crypto.randomUUID)
+    ? crypto.randomUUID()
+    : Date.now().toString(36) + Math.random().toString(36).slice(2);
+}
 
-/* ───────── DEALS ───────── */
+/* ── INPUT VALIDATION ─────────────────────────────────────
+ * Validate all user input BEFORE storing — prevents DB bloat,
+ * malicious large payloads, and weird edge behaviours.
+ */
+const LIMITS = {
+  NAME_MAX:  200,
+  STORE_MAX: 100,
+  LOC_MAX:   200,
+  PRICE_MAX: 9999,
+  PRICE_MIN: 0,
+};
+
+function validateItem(name, price) {
+  if (!name || !name.trim())
+    return { ok: false, error: 'Enter an item name' };
+  if (name.trim().length > LIMITS.NAME_MAX)
+    return { ok: false, error: `Item name must be ${LIMITS.NAME_MAX} characters or fewer` };
+  if (isNaN(price) || price < LIMITS.PRICE_MIN)
+    return { ok: false, error: 'Enter a valid price' };
+  if (price > LIMITS.PRICE_MAX)
+    return { ok: false, error: `Price seems too high — is $${price.toFixed(2)} correct?` };
+  return { ok: true };
+}
+
+function validateStore(name, loc) {
+  if (!name || !name.trim())
+    return { ok: false, error: 'Enter a store name' };
+  if (name.trim().length > LIMITS.STORE_MAX)
+    return { ok: false, error: `Store name must be ${LIMITS.STORE_MAX} characters or fewer` };
+  if (loc && loc.length > LIMITS.LOC_MAX)
+    return { ok: false, error: `Location must be ${LIMITS.LOC_MAX} characters or fewer` };
+  return { ok: true };
+}
+
+/* ── ERROR LOGGING ────────────────────────────────────────
+ * Post-launch visibility — writes to Firebase /errors path.
+ * Silently no-ops if Firebase isn't connected.
+ */
+function logError(context, err) {
+  console.error(`[${context}]`, err);
+  try {
+    firebase.database().ref('errors').push().set({
+      context,
+      message: err?.message || String(err),
+      stack:   err?.stack   || null,
+      date:    today(),
+      ts:      Date.now()
+    });
+  } catch(e) { /* never let error logging break the app */ }
+}
+
+/* ── LOADING STATE ────────────────────────────────────────
+ * setLoading(btnId, true/false) disables button and shows spinner.
+ * Used during entry adds to signal in-progress state.
+ */
+function setLoading(id, loading) {
+  const btn = document.getElementById(id);
+  if (!btn) return;
+  if (loading) {
+    btn.dataset.origText = btn.innerHTML;
+    btn.innerHTML = '<div class="spinner" style="width:16px;height:16px;border-width:2px;display:inline-block;vertical-align:middle"></div>';
+    btn.disabled = true;
+  } else {
+    if (btn.dataset.origText) btn.innerHTML = btn.dataset.origText;
+    btn.disabled = false;
+  }
+}
+
+/*
+ * Bug 3 fix: XSS prevention — escape all user-supplied strings before
+ * inserting into innerHTML. Applied to e.name, e.store everywhere rendered.
+ */
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str).replace(/[&<>"']/g, c => ({
+    '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
+  }[c]));
+}
+
+/*
+ * Improvement 1: unit normalization display
+ * Converts stored oz value to the selected display unit.
+ * _unitDisplay state is declared in the STATE block at top of script.
+ */
+
+function unitPriceDisplay(entry) {
+  if (!entry.unitPrice || !entry.sizeOz) return null;
+  switch(_unitDisplay) {
+    case 'lb':
+      // 16 oz per lb
+      return { value: (entry.price / (entry.sizeOz / 16)).toFixed(2), label: 'lb' };
+    case 'item':
+      // treat each count as one "item"
+      return entry.sizeUnit === 'ct'
+        ? { value: (entry.price / entry.sizeOz).toFixed(2), label: 'item' }
+        : null;
+    default: // 'oz'
+      return { value: entry.unitPrice.toFixed(2), label: entry.sizeUnit || 'oz' };
+  }
+}
+
+window.setUnitDisplay = function(unit) {
+  _unitDisplay = unit;
+  localStorage.setItem('unit_display', unit);
+  document.querySelectorAll('.unit-chip').forEach(b =>
+    b.classList.toggle('active', b.dataset.unit === unit)
+  );
+  invalidateCache();
+  renderPrices();
+};
+
+function staleTag(dateStr) {
+  const days = (Date.now() - new Date(dateStr)) / 86400000;
+  if (days > 60) return `<span class="stale-tag">⚠ ${Math.floor(days)}d old</span>`;
+  return '';
+}
+
+function extractSize(name) {
+  if (!name) return null;
+  const ozMatch  = name.match(/(\d+(\.\d+)?)\s*(oz|ounce)/i);
+  if (ozMatch)  return { value: parseFloat(ozMatch[1]),          unit:'oz' };
+  const lbMatch  = name.match(/(\d+(\.\d+)?)\s*(lb|pound)/i);
+  if (lbMatch)  return { value: parseFloat(lbMatch[1]) * 16,    unit:'oz' };
+  const gMatch   = name.match(/(\d+(\.\d+)?)\s*g\b/i);
+  if (gMatch)   return { value: parseFloat(gMatch[1]) * 0.03527,unit:'oz' };
+  const mlMatch  = name.match(/(\d+(\.\d+)?)\s*ml\b/i);
+  if (mlMatch)  return { value: parseFloat(mlMatch[1]) * 0.0338, unit:'oz' };
+  const ctMatch  = name.match(/(\d+)\s*(count|ct|pack|pk)\b/i);
+  if (ctMatch)  return { value: parseFloat(ctMatch[1]),          unit:'ct' };
+  return null;
+}
+
+function normalizeItemName(name) {
+  if (!name) return 'Unknown item';
+  let c = name.toLowerCase();
+  c = c.replace(/[^a-z0-9\s]/g, '');
+  c = c.replace(/\borg\b/g, 'organic').replace(/\bhh\b/g, 'half half');
+  // DO NOT strip crunchy/creamy/salted — they distinguish different products
+  c = c.replace(/half\s+half/g, 'half and half');
+  c = c.replace(/\s+/g, ' ').trim();
+  c = c.replace(/\b\w/g, ch => ch.toUpperCase());
+  return c || 'Unknown item';
+}
+
+// Fuzzy match: Levenshtein distance ≤ 3 or one is substring of the other
+function fuzzyMatch(a, b) {
+  a = a.toLowerCase(); b = b.toLowerCase();
+  if (a === b) return true;
+  if (a.includes(b) || b.includes(a)) return true;
+  // simple Levenshtein
+  const m = a.length, n = b.length;
+  if (Math.abs(m - n) > 4) return false;
+  const dp = Array.from({length: m+1}, (_,i) => Array.from({length:n+1},(_,j) => i===0?j:j===0?i:0));
+  for (let i=1;i<=m;i++) for (let j=1;j<=n;j++)
+    dp[i][j] = a[i-1]===b[j-1] ? dp[i-1][j-1] : 1+Math.min(dp[i-1][j],dp[i][j-1],dp[i-1][j-1]);
+  return dp[m][n] <= 3;
+}
+
+let _fuzzyMatch = null;
+function checkFuzzy(val) {
+  _fuzzyMatch = null;
+  const hint = document.getElementById('fuzzy-hint');
+  hint.style.display = 'none';
+  if (val.length < 3) return;
+  const names = [...new Set(db.entries.map(e => e.name))];
+  const normalized = normalizeItemName(val);
+  const match = names.find(n => n !== normalized && fuzzyMatch(normalized, n));
+  if (match) {
+    _fuzzyMatch = match;
+    hint.style.display = 'block';
+    hint.innerHTML = `⚠️ Similar item exists: <b>${match}</b> — tap to use that name instead`;
+  }
+}
+
+function acceptFuzzy() {
+  if (_fuzzyMatch) {
+    document.getElementById('p-name').value = _fuzzyMatch;
+    document.getElementById('fuzzy-hint').style.display = 'none';
+    _fuzzyMatch = null;
+  }
+}
+
+/* ── ENTRIES ──────────────────────────────────────────── */
+function addEntry() {
+  const name       = document.getElementById('p-name').value.trim();
+  const price      = parseFloat(document.getElementById('p-price').value);
+  const storeIndex = parseInt(document.getElementById('p-store').value);
+  const cat        = document.getElementById('p-cat').value;
+  const date       = document.getElementById('p-date').value || today();
+
+  if (!name)             return toast('Enter an item name');
+  if (!db.stores.length) return toast('Add a store first (Settings tab)');
+
+  // Input validation before storing
+  const vItem = validateItem(name, price);
+  if (!vItem.ok) return toast(vItem.error);
+
+  const store = db.stores[storeIndex]?.name;
+  if (!store) return toast('Select a store');
+
+  // Item 10: persist last-used store and category
+  _lastStore = store;
+  _lastCat   = cat;
+  localStorage.setItem('last_store', store);
+  localStorage.setItem('last_cat',   cat);
+
+  const size           = extractSize(name);
+  const normalizedName = normalizeItemName(name);
+  const existing       = db.entries.find(e => e.name === normalizedName && e.store === store);
+
+  // Bug 2 fix: capture price BEFORE mutation — existing.price changes inside updateDB
+  const prevPrice = existing ? existing.price : null;
+
+  if (existing) {
+    // Bug 4 fix: guard against divide-by-zero when existing.price is 0
+    const pctChange = existing.price > 0
+      ? Math.abs((price - existing.price) / existing.price)
+      : 0;
+    if (pctChange > 0.5) {
+      const direction = price > existing.price ? 'increase' : 'decrease';
+      const ok = confirm(
+        `⚠️ Price ${direction} of ${(pctChange*100).toFixed(0)}% detected!\n\n` +
+        `Previous: $${existing.price.toFixed(2)}\n` +
+        `New:      $${price.toFixed(2)}\n\n` +
+        `Is this correct?`
+      );
+      if (!ok) return;
+    }
+  }
+
+  setLoading('btn-add-entry', true);
+  updateDB(db => {
+    // Re-find entry inside the callback — db here is the authoritative reference,
+    // not the outer closure snapshot. This is the correct fix for the scope bug.
+    const e = db.entries.find(e => e.name === normalizedName && e.store === store);
+    if (e) {
+      if (!e.history) e.history = [];
+      if (!e.history.length || e.history[0].price !== e.price) {
+        e.history.unshift({ price: e.price, date: e.date });
+      }
+      if (e.history.length > 10) e.history = e.history.slice(0, 10);
+      e.price     = price;
+      e.date      = date;
+      e.sizeOz    = size ? size.value : e.sizeOz;
+      e.sizeUnit  = size ? size.unit  : e.sizeUnit;
+      e.unitPrice = size ? price / size.value : null;
+      e.cat       = cat;
+    } else {
+      db.entries.push({
+        name: normalizedName, price, store, cat,
+        storeId: db.stores[storeIndex]?.id || null,
+        sizeOz: size ? size.value : null, sizeUnit: size ? size.unit : null,
+        unitPrice: size ? price / size.value : null,
+        date, id: newId(), history: []
+      });
+    }
+  });
+
+  document.getElementById('p-name').value  = '';
+  document.getElementById('p-price').value = '';
+  document.getElementById('fuzzy-hint').style.display = 'none';
+  setTimeout(() => {
+    setLoading('btn-add-entry', false);
+    document.getElementById('p-name').focus();
+  }, 350); // slightly after debounce fires
+  // Bug 2 fix: use prevPrice (captured before mutation) not existing.price (already updated)
+  toast(prevPrice !== null
+    ? `Updated: $${prevPrice.toFixed(2)} → $${price.toFixed(2)}`
+    : 'Entry added!');
+
+  // Nice-to-have: flash the updated card
+  if (prevPrice !== null) {
+    const updated = db.entries.find(e => e.name === normalizedName && e.store === store);
+    if (updated) setTimeout(() => flashCard(updated.id), 80);
+  }
+}
+
+function removeEntry(id) {
+  if (!confirm('Remove this price entry?')) return;
+  updateDB(db => { db.entries = db.entries.filter(e => e.id !== id); });
+}
+
+function startEdit(id) {
+  // close any other open edits
+  document.querySelectorAll('.edit-overlay.open').forEach(el => el.classList.remove('open'));
+  const overlay = document.getElementById('edit-' + id);
+  if (overlay) overlay.classList.add('open');
+}
+
+function cancelEdit(id) {
+  const overlay = document.getElementById('edit-' + id);
+  if (overlay) overlay.classList.remove('open');
+}
+
+function saveEdit(id) {
+  const entry    = db.entries.find(e => e.id === id);
+  if (!entry) return;
+  const newPrice = parseFloat(document.getElementById('ep-' + id).value);
+  const newName  = document.getElementById('en-' + id).value.trim();
+  // Improvement 2: read category from inline edit dropdown
+  const newCat   = document.getElementById('ec-' + id)?.value || entry.cat || 'Other';
+  // Bug 1 fix: cat was undefined — read from entry or dropdown
+  const cat      = newCat;
+
+  if (isNaN(newPrice) || newPrice < 0) return toast('Invalid price');
+  if (!newName) return toast('Name cannot be empty');
+
+  // Bug 4 fix: guard divide-by-zero when existing price is 0
+  const pctChange = entry.price > 0
+    ? Math.abs((newPrice - entry.price) / entry.price)
+    : 0;
+  if (pctChange > 0.5) {
+    const direction = newPrice > entry.price ? 'increase' : 'decrease';
+    const ok = confirm(
+      `⚠️ Price ${direction} of ${(pctChange*100).toFixed(0)}% detected!\n\n` +
+      `Previous: $${entry.price.toFixed(2)}\n` +
+      `New:      $${newPrice.toFixed(2)}\n\n` +
+      `Is this correct?`
+    );
+    if (!ok) return;
+  }
+
+  // Item 10: persist last-used category
+  _lastCat = cat;
+  localStorage.setItem('last_cat', cat);
+
+  updateDB(db => {
+    const e = db.entries.find(x => x.id === id);
+    if (!e) return;
+    if (!e.history) e.history = [];
+    // Item 3: only record history when price actually changed
+    if (!e.history.length || e.history[0].price !== e.price) {
+      e.history.unshift({ price: e.price, date: e.date });
+    }
+    if (e.history.length > 10) e.history = e.history.slice(0, 10);
+    const size  = extractSize(newName);
+    e.price     = newPrice;
+    e.name      = normalizeItemName(newName);
+    e.cat       = cat;
+    e.date      = today();
+    e.sizeOz    = size ? size.value : e.sizeOz;
+    e.sizeUnit  = size ? size.unit  : e.sizeUnit;
+    e.unitPrice = size ? newPrice / size.value : null;
+  });
+  toast('Updated!');
+  setTimeout(() => flashCard(id), 80);
+}
+
+function toggleHistory(id) {
+  const el = document.getElementById('hist-' + id);
+  if (el) el.classList.toggle('open');
+}
+
+/* ── PREPROCESSED CACHE ───────────────────────────────────
+ * Built once per data change, consumed by all render functions.
+ * Avoids re-scanning db.entries on every keystroke / re-render.
+ * _cache is declared in the STATE block at the top of the script.
+ */
+function buildCache() {
+  const bestMap  = {};
+  const worstMap = {};
+  const unitMap  = {};  // itemName -> canonical unit
+
+  db.entries.forEach(e => {
+    const unit = e.sizeUnit || null;
+    if (!unitMap[e.name] && unit) unitMap[e.name] = unit;
+    const sameUnit = unit && unitMap[e.name] && unit === unitMap[e.name];
+    // Item 4: pricingMode controls which value drives best/worst
+    const v = (_pricingMode === 'unit' && e.unitPrice && sameUnit) ? e.unitPrice : e.price;
+    if (bestMap[e.name]  === undefined || v < bestMap[e.name])  bestMap[e.name]  = v;
+    if (worstMap[e.name] === undefined || v > worstMap[e.name]) worstMap[e.name] = v;
+  });
+
+  // Per-category sorted entries (preprocessed once)
+  const cats = [...new Set(db.entries.map(e => e.cat || 'Other'))].sort();
+  const byCat = {};
+  cats.forEach(c => byCat[c] = []);
+  db.entries.forEach(e => byCat[e.cat || 'Other'].push(e));
+
+  // Stale threshold
+  const STALE_DAYS = 60;
+  const staleIds   = new Set(db.entries.filter(e => staleDays(e.date) > STALE_DAYS).map(e => e.id));
+
+  _cache = { bestMap, worstMap, unitMap, byCat, cats, staleIds, STALE_DAYS };
+}
+
+function staleDays(dateStr) {
+  if (!dateStr) return 0;
+  return (Date.now() - new Date(dateStr)) / 86400000;
+}
+
+function getCache() {
+  if (!_cache) buildCache();
+  return _cache;
+}
+
+function invalidateCache() { _cache = null; }
+
+/* ── TREND INDICATOR ─────────────────────────────────────
+ * Compares current price to oldest history entry.
+ * Returns { arrow, label, cls } based on direction.
+ * Only shown when >= 2 data points exist.
+ */
+function trendInfo(entry) {
+  const hist = entry.history;
+  if (!hist || hist.length === 0) return null;
+  const oldest = hist[hist.length - 1].price;
+  if (oldest === 0) return null;  // guard divide-by-zero
+  const diff = entry.price - oldest;
+  const pct  = Math.abs(diff / oldest * 100);
+  if (pct < 0.5) return { arrow: '→', label: 'stable',              cls: 'trend-fl' };
+  if (diff > 0)  return { arrow: '↑', label: `+${pct.toFixed(0)}%`, cls: 'trend-up' };
+  return           { arrow: '↓', label: `-${pct.toFixed(0)}%`, cls: 'trend-dn' };
+}
+
+function sparklineHtml(entry) {
+  const points = [entry.price, ...(entry.history||[]).map(h=>h.price)].reverse();
+  if (points.length < 2) return '';
+  const mn = Math.min(...points), mx = Math.max(...points), rng = mx - mn || 1;
+  const bars = points.map(p => {
+    const h = Math.max(3, Math.round(((p - mn) / rng) * 16));
+    return `<span style="height:${h}px"></span>`;
+  }).join('');
+  return `<span class="sparkline">${bars}</span>`;
+}
+
+/* ── RENDER PRICES ─────────────────────────────────────── */
+// Item 2: debounce search — _searchTimer declared in STATE block at top of script
+function debouncedRenderPrices() {
+  clearTimeout(_searchTimer);
+  _searchTimer = setTimeout(renderPrices, 120);
+}
+window.debouncedRenderPrices = debouncedRenderPrices;
+
+// Item 4: pricing mode toggle (total price vs unit price comparisons)
+function togglePricingMode() {
+  _pricingMode = _pricingMode === 'total' ? 'unit' : 'total';
+  localStorage.setItem('pricing_mode', _pricingMode);
+  const btn = document.getElementById('pricing-mode-btn');
+  if (btn) {
+    const isUnit = _pricingMode === 'unit';
+    btn.textContent  = isUnit ? '$/unit — ON' : '$/unit — OFF';
+    btn.title        = isUnit ? 'Comparing by unit price ($/oz). Tap to switch to total price.' : 'Comparing by total price. Tap to switch to unit price ($/oz).';
+    btn.style.background = isUnit ? 'var(--green-700)' : '';
+    btn.style.color      = isUnit ? 'var(--white)'     : '';
+    btn.style.borderColor= isUnit ? 'var(--green-700)' : '';
+  }
+  invalidateCache();
+  renderPrices();
+}
+window.togglePricingMode = togglePricingMode;
+
+// Item 6: age filter
+window.setAgeFilter = function(days) {
+  _ageFilter = days;
+  document.querySelectorAll('.age-chip').forEach(b =>
+    b.classList.toggle('active', parseInt(b.dataset.age) === days)
+  );
+  renderPrices();
+};
+
+// Item 11: pop animation on updated card
+function flashCard(id) {
+  const card = document.querySelector(`[data-entry-id="${id}"]`);
+  if (card) {
+    card.classList.remove('updated');
+    void card.offsetWidth; // force reflow
+    card.classList.add('updated');
+  }
+}
+function renderPrices() {
+  const el = document.getElementById('prices-list');
+  if (!db.entries.length) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">🏷️</div><p>No price entries yet.<br>Add one above or import from a photo.</p></div>';
+    renderCatFilters([]);
+    return;
+  }
+
+  // Improvement 3: preserve scroll position across re-renders
+  const scrollY = window.scrollY;
+
+  const cache   = getCache();
+  const query   = (document.getElementById('price-search')?.value || '').toLowerCase().trim();
+  const sortBy  = document.getElementById('price-sort')?.value || 'name';
+
+  // Build category filter chips
+  renderCatFilters(cache.cats);
+
+  // Restore unit display and pricing mode chip states on every render
+  document.querySelectorAll('.unit-chip').forEach(b =>
+    b.classList.toggle('active', b.dataset.unit === _unitDisplay)
+  );
+  const pmBtn = document.getElementById('pricing-mode-btn');
+  if (pmBtn) {
+    const isUnit = _pricingMode === 'unit';
+    pmBtn.textContent   = isUnit ? '$/unit — ON' : '$/unit — OFF';
+    pmBtn.style.background  = isUnit ? 'var(--green-700)' : '';
+    pmBtn.style.color        = isUnit ? 'var(--white)'     : '';
+    pmBtn.style.borderColor  = isUnit ? 'var(--green-700)' : '';
+  }
+
+  // Determine which entries to show
+  let entries = db.entries.filter(e => {
+    if (_activeFilter !== 'All' && (e.cat || 'Other') !== _activeFilter) return false;
+    if (query && !e.name.toLowerCase().includes(query) && !e.store.toLowerCase().includes(query)) return false;
+    // Item 6: age filter
+    if (_ageFilter > 0 && staleDays(e.date) > _ageFilter) return false;
+    return true;
+  });
+
+  // Sort — added 'recent' for today-first; stable tiebreaker by id
+  entries = [...entries].sort((a, b) => {
+    if (sortBy === 'price-asc')  return a.price - b.price           || a.id - b.id;
+    if (sortBy === 'price-desc') return b.price - a.price           || a.id - b.id;
+    if (sortBy === 'date')       return (b.date || '').localeCompare(a.date || '') || a.id - b.id;
+    if (sortBy === 'recent')     return staleDays(a.date) - staleDays(b.date)      || a.id - b.id;
+    return a.name.localeCompare(b.name) || a.price - b.price || a.id - b.id;
+  });
+
+  if (!entries.length) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">🔍</div><p>No items match your search.</p></div>';
+    return;
+  }
+
+  // Build O(1) Set for membership checks — replaces O(n²) entries.includes(e)
+  const entrySet = new Set(entries.map(e => e.id));
+
+  const freshCats = cache.cats.filter(cat =>
+    (cache.byCat[cat] || []).some(e => !cache.staleIds.has(e.id) && entrySet.has(e.id))
+  );
+
+  const freshHtml = freshCats.map(cat => {
+    const catEntries = (cache.byCat[cat] || []).filter(e =>
+      !cache.staleIds.has(e.id) && entrySet.has(e.id)
+    );
+    if (!catEntries.length) return '';
+    return `<div>
+      <div class="cat-head">${cat}</div>
+      ${catEntries.map(e => entryCardHtml(e, cache)).join('')}
+    </div>`;
+  }).join('');
+
+  const stale = entries.filter(e => cache.staleIds.has(e.id));
+  const staleHtml = stale.length ? `
+    <div class="stale-section">
+      <div class="stale-toggle" id="stale-toggle" onclick="toggleStaleSection()">
+        <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+        ⚠️ ${stale.length} stale price${stale.length !== 1 ? 's' : ''} (older than ${cache.STALE_DAYS} days) — tap to review
+      </div>
+      <div class="stale-items" id="stale-items">
+        ${stale.map(e => entryCardHtml(e, cache)).join('')}
+      </div>
+    </div>` : '';
+
+  el.innerHTML = freshHtml + staleHtml;
+  // Improvement 3: restore scroll position — prevents jumping on filter/sort changes
+  requestAnimationFrame(() => window.scrollTo(0, scrollY));
+}
+
+window.toggleStaleSection = function() {
+  document.getElementById('stale-toggle')?.classList.toggle('open');
+  document.getElementById('stale-items')?.classList.toggle('open');
+};
+
+function renderCatFilters(cats) {
+  const el = document.getElementById('cat-filters');
+  if (!el) return;
+  const all = ['All', ...cats];
+  el.innerHTML = all.map(c =>
+    `<button class="filter-chip ${_activeFilter === c ? 'active' : ''}" onclick="setFilter('${c}')">${c}</button>`
+  ).join('');
+}
+
+window.setFilter = function(cat) {
+  _activeFilter = cat;
+  renderPrices();
+};
+
+/* ── ENTRY CARD HTML ──────────────────────────────────── */
+const EPS = 0.0001; // Fix 3: named epsilon for floating-point equality checks
+
+function entryCardHtml(e, cache) {
+  const sameUnit  = e.sizeUnit && cache.unitMap[e.name] === e.sizeUnit;
+  const useUnit   = _pricingMode === 'unit' && e.unitPrice && sameUnit;
+  const v         = useUnit ? e.unitPrice : e.price;
+  const isBest    = cache.bestMap[e.name]  !== undefined && Math.abs(v - cache.bestMap[e.name])  <= EPS;
+  const isWorst   = cache.worstMap[e.name] !== undefined && Math.abs(v - cache.worstMap[e.name]) <= EPS && cache.bestMap[e.name] !== cache.worstMap[e.name];
+  const isStale   = cache.staleIds.has(e.id);
+  const si        = db.stores.findIndex(s => s.name === e.store);
+  const hist      = e.history && e.history.length;
+  const trend     = trendInfo(e);
+  const days      = staleDays(e.date);
+  const isToday   = days < 1;
+  const daysAgo   = isToday ? 'today' : days < 2 ? 'yesterday' : `${Math.floor(days)}d ago`;
+  // Both e.name and shopping list names are normalized — exact match is correct and fast
+  const inList    = shoppingList.some(i => i.name === e.name);
+  // Bug 3: escape all user strings before innerHTML insertion
+  const safeName  = escapeHtml(e.name);
+  const safeStore = escapeHtml(e.store);
+  // Improvement 1: unit price in selected display unit
+  const unitDisp  = unitPriceDisplay(e);
+
+  // Improvement 2: category options for inline edit dropdown
+  const cats = ['Dairy','Produce','Meat & Seafood','Pantry','Frozen','Bakery','Beverages','Snacks','Other'];
+  const catOpts = cats.map(c =>
+    `<option value="${c}" ${(e.cat||'Other')===c?'selected':''}>${c}</option>`
+  ).join('');
+
+  return `
+  <div class="entry-card ${isBest?'is-best':''} ${isStale?'is-stale':''}"
+       data-entry-id="${e.id}"
+       style="${isToday?'background:#f0fdf4;':''}">
+    <div class="entry-main">
+      <div class="entry-name">
+        ${isBest ? '🏆' : ''}
+        <span>${safeName}</span>
+        ${trend ? `<span class="${trend.cls}">${trend.arrow}${trend.label}${sparklineHtml(e)}</span>` : ''}
+      </div>
+      <div class="entry-meta">
+        <span class="badge-store sc-${si>=0?si%5:0}">${safeStore}</span>
+        ${e.sizeOz ? `<span>${e.sizeOz.toFixed(1)} ${escapeHtml(e.sizeUnit||'oz')}</span>` : ''}
+        ${unitDisp ? `<span style="font-weight:${_pricingMode==='unit'?'600':'400'}">$${unitDisp.value}/${unitDisp.label}</span>` : ''}
+        <span style="color:${isStale?'#b45309':isToday?'#166534':'var(--gray-400)'}">
+          Updated ${daysAgo}${isStale?' ⚠️':isToday?' ✨':''}
+        </span>
+        ${isBest  ? '<span class="badge badge-best">best</span>'     : ''}
+        ${isWorst ? '<span class="badge badge-high">not best</span>' : ''}
+      </div>
+      <!-- Improvement 2: inline edit with category dropdown -->
+      <div class="edit-overlay" id="edit-${e.id}">
+        <div class="edit-row">
+          <input type="text"   id="en-${e.id}" value="${safeName}" style="flex:2">
+          <input type="number" id="ep-${e.id}" value="${e.price.toFixed(2)}" step="0.01" style="width:90px">
+          <select id="ec-${e.id}" style="font-size:13px;padding:7px 8px;flex:1;min-width:100px">${catOpts}</select>
+        </div>
+        <div style="display:flex;gap:6px;margin-top:6px">
+          <button class="btn btn-primary btn-sm" onclick="saveEdit(${e.id})" style="width:auto">Save</button>
+          <button class="btn btn-ghost  btn-sm" onclick="cancelEdit(${e.id})" style="width:auto">✕</button>
+        </div>
+      </div>
+      ${hist ? `
+      <div class="history-panel" id="hist-${e.id}">
+        <div style="font-size:11px;font-weight:600;color:var(--gray-400);text-transform:uppercase;margin-bottom:4px">Price history</div>
+        ${e.history.map(h=>`<div class="history-row"><span>${escapeHtml(h.date||'—')}</span><span>$${parseFloat(h.price).toFixed(2)}</span></div>`).join('')}
+      </div>` : ''}
+    </div>
+    <div class="entry-actions">
+      <span class="entry-price">$${e.price.toFixed(2)}</span>
+      <button class="icon-btn ${inList?'':'success'} add-to-list-btn"
+        data-name="${safeName}"
+        title="${inList?'Already on list':'Add to shopping list'}"
+        ${inList?'style="color:var(--green-600)"':''}>
+        <svg viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
+      </button>
+      <button class="icon-btn" onclick="startEdit(${e.id})" title="Edit">
+        <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+      </button>
+      ${hist ? `
+      <button class="icon-btn" onclick="toggleHistory(${e.id})" title="History">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      </button>
+      <button class="icon-btn" onclick="openChartModal(${e.id})" title="Price chart">
+        <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      </button>` : ''}
+      <button class="icon-btn danger" onclick="removeEntry(${e.id})" title="Delete">
+        <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6M10 11v6M14 11v6"/></svg>
+      </button>
+    </div>
+  </div>`;
+}
+
+/* ── BEST DEALS ───────────────────────────────────────── */
 function calculateBestDeals() {
+  const cache  = getCache();
   const result = {};
   db.entries.forEach(item => {
-    if (!result[item.name]) result[item.name] = { best:item, worst:item };
-    else {
-      if (item.price < result[item.name].best.price) result[item.name].best = item;
-      if (item.price > result[item.name].worst.price) result[item.name].worst = item;
+    const sameUnit = cache.unitMap[item.name] === (item.sizeOz != null ? (item.sizeUnit||'oz') : null);
+    const iv = (item.unitPrice && sameUnit) ? item.unitPrice : item.price;
+    if (!result[item.name]) {
+      result[item.name] = { best: item, worst: item, all: [item] };
+    } else {
+      result[item.name].all.push(item);
+      const bv = (result[item.name].best.unitPrice && sameUnit) ? result[item.name].best.unitPrice : result[item.name].best.price;
+      const wv = (result[item.name].worst.unitPrice && sameUnit) ? result[item.name].worst.unitPrice : result[item.name].worst.price;
+      if (iv < bv) result[item.name].best  = item;
+      if (iv > wv) result[item.name].worst = item;
     }
   });
   return result;
 }
 
-function renderDeals() {
-  const el = document.getElementById('deals-content');
-  const deals = calculateBestDeals();
-  let total = 0;
-
-  el.innerHTML = `
-    <div class="card">
-      ${Object.values(deals).map(d => {
-        total += d.worst.price - d.best.price;
-        return `• ${d.best.name} — ${d.best.store}`;
-      }).join('<br>')}
-      <hr>💰 $${total.toFixed(2)} saved
-    </div>
-  `;
+function calculateStoreTotals() {
+  const bestPriceForItem = {};
+  db.entries.forEach(e => {
+    if (bestPriceForItem[e.name] === undefined || e.price < bestPriceForItem[e.name])
+      bestPriceForItem[e.name] = e.price;
+  });
+  const storeMap = {};
+  db.entries.forEach(e => {
+    if (!storeMap[e.store]) storeMap[e.store] = {};
+    if (storeMap[e.store][e.name] === undefined || e.price < storeMap[e.store][e.name])
+      storeMap[e.store][e.name] = e.price;
+  });
+  const result = {};
+  Object.entries(storeMap).forEach(([store, items]) => {
+    let storeCost = 0, bestCost = 0;
+    Object.entries(items).forEach(([itemName, storePrice]) => {
+      storeCost += storePrice;
+      bestCost  += bestPriceForItem[itemName];
+    });
+    result[store] = { storeCost, bestCost, diff: storeCost - bestCost };
+  });
+  return result;
 }
 
-/* ───────── SAVINGS ───────── */
+/*
+ * Best Cart Cost: for every tracked item, what would you actually pay
+ * if you bought it at the best-priced store? Broken down per store
+ * so you can see exactly which items go where and the real total.
+ */
+function bestCartCostHtml(deals) {
+  if (!Object.keys(deals).length) return '';
+
+  // Group items by their best store
+  const byStore = {};
+  let grandTotal = 0;
+  Object.values(deals).forEach(d => {
+    const s = d.best.store;
+    if (!byStore[s]) byStore[s] = [];
+    byStore[s].push(d.best);
+    grandTotal += d.best.price;
+  });
+
+  const storeRows = Object.entries(byStore).map(([store, items]) => {
+    const subtotal = items.reduce((s, e) => s + e.price, 0);
+    const si = db.stores.findIndex(s => s.name === store);
+    return `<div class="cart-store-row">
+      <span class="cart-store-name">${store} <span style="font-size:11px;opacity:0.7">(${items.length} item${items.length!==1?'s':''})</span></span>
+      <span class="cart-store-total">$${subtotal.toFixed(2)}</span>
+    </div>
+    ${items.map(e => `
+      <div style="display:flex;justify-content:space-between;padding:3px 0 3px 12px;font-size:12px;color:rgba(255,255,255,0.6);border-bottom:1px solid rgba(255,255,255,0.05)">
+        <span>${e.name}</span><span>$${e.price.toFixed(2)}</span>
+      </div>`).join('')}`;
+  }).join('');
+
+  return `<div class="cart-cost-card">
+    <div class="cart-cost-title">🛒 Best Cart Cost — what you'll actually pay</div>
+    <div style="font-size:12px;color:var(--green-200);margin-bottom:10px">Cherry-picking the best price for every item</div>
+    ${storeRows}
+    <div class="cart-grand">
+      <span>Total</span>
+      <span>$${grandTotal.toFixed(2)}</span>
+    </div>
+  </div>`;
+}
+
+function renderDeals() {
+  const el    = document.getElementById('deals-content');
+  const deals = calculateBestDeals();
+
+  if (!Object.keys(deals).length) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">⭐</div><p>No prices yet — add some in the Prices tab.</p></div>';
+    return;
+  }
+
+  let totalSavings = 0, worstTotal = 0;
+  const dealRows = Object.values(deals).sort((a,b) => a.best.name.localeCompare(b.best.name)).map(d => {
+    const saving = d.worst.price - d.best.price;
+    if (saving > 0) totalSavings += saving;
+    worstTotal += d.worst.price;
+    const si    = db.stores.findIndex(s => s.name === d.best.store);
+    const tied  = d.all.filter(x => x.price === d.best.price);
+    const trend = trendInfo(d.best);
+    return `<div class="deal-row">
+      <div class="deal-item">
+        ${d.best.name}
+        ${tied.length > 1 ? `<span style="font-size:11px;color:var(--gray-400)"> (tied ${tied.length})</span>` : ''}
+        ${trend ? `<span class="${trend.cls}" style="font-size:11px;margin-left:4px">${trend.arrow}</span>` : ''}
+      </div>
+      <div class="deal-store"><span class="badge-store sc-${si>=0?si%5:0}">${d.best.store}</span></div>
+      <div class="deal-prices">
+        <div class="deal-best">$${d.best.price.toFixed(2)}</div>
+        ${saving > 0 ? `<div class="deal-save">save $${saving.toFixed(2)}</div>` : '<div class="deal-save">—</div>'}
+      </div>
+    </div>`;
+  }).join('');
+
+  const percent      = worstTotal > 0 ? (totalSavings / worstTotal * 100) : 0;
+  const storeTotals  = calculateStoreTotals();
+  const storeEntries = Object.entries(storeTotals);
+  let easiest = null;
+  if (storeEntries.length)
+    easiest = storeEntries.map(([s,d]) => ({store:s,...d})).sort((a,b) => a.diff - b.diff)[0];
+
+  el.innerHTML = `
+    <div class="metrics">
+      <div class="metric"><div class="metric-val">${Object.keys(deals).length}</div><div class="metric-lbl">items tracked</div></div>
+      <div class="metric"><div class="metric-val">$${totalSavings.toFixed(2)}</div><div class="metric-lbl">max savings</div></div>
+      <div class="metric"><div class="metric-val">${percent.toFixed(0)}%</div><div class="metric-lbl">vs highest prices</div></div>
+    </div>
+
+    ${bestCartCostHtml(deals)}
+
+    <div class="card">
+      <div class="card-title">Best price per item</div>
+      ${dealRows}
+    </div>
+
+    <div class="card">
+      <div class="card-title">👌 Store comparison</div>
+      <div style="font-size:12px;color:var(--gray-400);margin-bottom:10px">Your actual cost per store vs cherry-picking best prices</div>
+      ${storeEntries.map(([store, data]) => {
+        const isBest = data.diff < 0.01;
+        return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--gray-100)">
+          <span style="flex:1;font-weight:${isBest?'600':'400'};color:${isBest?'#166534':'inherit'}">${isBest?'✅ ':''}<b>${store}</b></span>
+          <span style="font-family:monospace;font-size:14px">$${data.storeCost.toFixed(2)}</span>
+          <span style="font-size:12px;color:${data.diff<0.01?'#166534':'#b45309'}">
+            ${data.diff < 0.01 ? '(best)' : `(+$${data.diff.toFixed(2)})`}
+          </span>
+        </div>`;
+      }).join('')}
+      <div style="margin-top:12px;padding:10px;background:var(--green-50);border-radius:var(--radius-md);font-size:13px;color:var(--green-800)">
+        🧠 ${!easiest ? '—' :
+          easiest.diff < 0.01 ? `<b>${easiest.store}</b> already has the best prices on everything!` :
+          easiest.diff < 2    ? `Just shop at <b>${easiest.store}</b> — only $${easiest.diff.toFixed(2)} more than splitting trips.` :
+          `Split your shopping to save up to <b>$${totalSavings.toFixed(2)}</b>.`}
+      </div>
+    </div>`;
+}
+
+/* ── SAVINGS BADGE ────────────────────────────────────── */
 function updateSavingsBadge() {
   let total = 0;
   Object.values(calculateBestDeals()).forEach(d => {
-    total += d.worst.price - d.best.price;
+    const s = d.worst.price - d.best.price;
+    if (s > 0) total += s;
+  });
+  document.getElementById('savings-badge').textContent = total > 0 ? `💰 You save $${total.toFixed(2)}` : '';
+}
+
+/* ── SHOPPING LIST ────────────────────────────────────── */
+// shoppingList is now stored in Firebase (db.shoppingList) for shared sync.
+// pushSync() always writes db.shoppingList = shoppingList before sending.
+function saveShoppingList() {
+  db.shoppingList = shoppingList;
+  pushSync();
+}
+
+function addToList() {
+  const input = document.getElementById('sl-input');
+  const val   = input.value.trim();
+  if (!val) return;
+  document.getElementById('sl-suggestions').innerHTML = '';
+  // Normalize at entry time so it matches the normalized entry names in the price DB
+  const normalizedVal = normalizeItemName(val);
+  if (shoppingList.find(i => i.name === normalizedVal)) {
+    toast('Already in list'); input.value = ''; return;
+  }
+  shoppingList.push({ name: normalizedVal, checked: false, id: newId() });
+  saveShoppingList();
+  input.value = '';
+  renderShoppingList();
+}
+
+// #5: quick-add from Prices search results
+window.addToListByName = function(name) {
+  const normalized = normalizeItemName(name);
+  if (shoppingList.find(i => i.name === normalized)) {
+    toast('Already in list'); return;
+  }
+  shoppingList.push({ name: normalized, checked: false, id: newId() });
+  saveShoppingList();
+  toast(`✓ "${normalized}" added to shopping list`);
+};
+
+function showSlSuggestions(val) {
+  const el = document.getElementById('sl-suggestions');
+  if (val.length < 2) { el.innerHTML = ''; return; }
+  const names  = [...new Set(db.entries.map(e => e.name))];
+  const inList = new Set(shoppingList.map(i => i.name));
+  const matches= names.filter(n => n.toLowerCase().includes(val.toLowerCase()) && !inList.has(n)).slice(0,5);
+  if (!matches.length) { el.innerHTML = ''; return; }
+  el.innerHTML = matches.map(n =>
+    `<div onclick="pickSlSuggestion('${n.replace(/'/g,"\\'")}')"`+
+    ` style="padding:8px 12px;font-size:13px;color:var(--gray-700);cursor:pointer;border:1px solid var(--gray-200);border-top:none;background:var(--white)">${n}</div>`
+  ).join('');
+}
+
+window.pickSlSuggestion = function(name) {
+  document.getElementById('sl-input').value = name;
+  document.getElementById('sl-suggestions').innerHTML = '';
+  addToList();
+};
+
+function toggleChecked(id) {
+  const item = shoppingList.find(i => i.id === id);
+  if (item) {
+    item.checked = !item.checked;
+    updateDB(db => { db.shoppingList = shoppingList; });
+    renderShoppingList();
+  }
+}
+
+function removeFromList(id) {
+  shoppingList = shoppingList.filter(i => i.id !== id);
+  updateDB(db => { db.shoppingList = shoppingList; });
+  renderShoppingList();
+}
+
+function clearChecked() {
+  shoppingList = shoppingList.filter(i => !i.checked);
+  updateDB(db => { db.shoppingList = shoppingList; });
+  renderShoppingList();
+}
+
+function clearAllList() {
+  if (!shoppingList.length) return;
+  if (!confirm('Clear the entire shopping list?')) return;
+  shoppingList = [];
+  updateDB(db => { db.shoppingList = []; });
+  renderShoppingList();
+}
+
+function updateTripLabel(val) {
+  document.getElementById('trip-label').textContent = '$' + parseFloat(val).toFixed(2);
+}
+
+/*
+ * renderShoppingList — the heart of the shopping mode
+ *
+ * Algorithm:
+ * 1. For each item on the list, find all price entries across stores.
+ * 2. Determine the best (lowest) price and which store has it.
+ * 3. Group items by their best store.
+ * 4. For items only found at one store, assign them there.
+ * 5. For items not in the price DB at all, put them in "Unknown".
+ * 6. Show per-store subtotals and total savings vs going to just one store.
+ * 7. Apply trip-minimum threshold: if splitting saves less than the threshold,
+ *    recommend the single cheapest store instead.
+ */
+function renderShoppingList() {
+  const el = document.getElementById('shopping-list-content');
+
+  if (!shoppingList.length) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">🛒</div><p>Your list is empty.<br>Type an item above to get started.</p></div>';
+    return;
+  }
+
+  const tripMin = parseFloat(document.getElementById('trip-min')?.value || localStorage.getItem('trip_min') || 3);
+
+  // #4: precompute name lookup map once — avoids O(n²) repeated .find() calls
+  const bestByItem = {};
+  db.entries.forEach(e => {
+    if (!bestByItem[e.name]) bestByItem[e.name] = { store: e.store, price: e.price, allPrices: [] };
+    bestByItem[e.name].allPrices.push({ store: e.store, price: e.price });
+    if (e.price < bestByItem[e.name].price) {
+      bestByItem[e.name].store = e.store;
+      bestByItem[e.name].price = e.price;
+    }
   });
 
-  document.getElementById('savings-badge').textContent =
-    total ? `💰 You save $${total.toFixed(2)}` : '';
+  // O(1) lookup by lowercase name — built once, used for every list item
+  const nameMap  = {};
+  Object.keys(bestByItem).forEach(n => { nameMap[n.toLowerCase()] = n; });
+  // Fix 5: precompute keys array once — avoids repeated Object.keys() in loops
+  const nameKeys = Object.keys(nameMap);
+
+  // Match list items to known items (exact then fuzzy)
+  const assigned  = {}; // storeName -> [{ listItem, matchedName, price, isKnown }]
+  const unknown   = [];
+  const storeNames= db.stores.map(s => s.name);
+
+  shoppingList.forEach(li => {
+    // #4: O(1) lookup — exact then fuzzy
+    const lc    = li.name.toLowerCase();
+    let matchKey = nameMap[lc];
+    if (!matchKey) {
+      const fuzzyKey = nameKeys.find(k => fuzzyMatch(k, lc));
+      if (fuzzyKey) matchKey = nameMap[fuzzyKey];
+    }
+
+    if (matchKey) {
+      const best = bestByItem[matchKey];
+      if (!assigned[best.store]) assigned[best.store] = [];
+      assigned[best.store].push({ listItem: li, matchedName: matchKey, price: best.price, allPrices: best.allPrices });
+    } else {
+      unknown.push(li);
+    }
+  });
+
+  // Calculate: what if we only shopped at cheapest single store?
+  const knownItems = shoppingList.filter(li => {
+    const lc = li.name.toLowerCase();
+    return nameMap[lc] || nameKeys.find(k => fuzzyMatch(k, lc));
+  });
+
+  // Savings = optimal (split) total vs single-store totals
+  let optimalTotal = 0;
+  Object.values(assigned).forEach(items => items.forEach(i => { if (!i.listItem.checked) optimalTotal += i.price; }));
+
+  // Single-store totals: for each store, what would all known list items cost?
+  const singleStoreTotals = {};
+  storeNames.forEach(store => {
+    let cost = 0, covered = 0;
+    knownItems.forEach(li => {
+      if (li.checked) return;
+      // #4: O(1) lookup
+      const lc       = li.name.toLowerCase();
+      const matchKey = nameMap[lc] || nameMap[nameKeys.find(k => fuzzyMatch(k, lc))];
+      if (!matchKey) return;
+      const storeEntry = bestByItem[matchKey].allPrices.find(p => p.store === store);
+      cost += storeEntry ? storeEntry.price : bestByItem[matchKey].price;
+      covered++;
+    });
+    singleStoreTotals[store] = { cost, covered };
+  });
+
+  const cheapestSingle = storeNames.length
+    ? storeNames.reduce((a,b) => singleStoreTotals[a].cost <= singleStoreTotals[b].cost ? a : b)
+    : null;
+
+  const splitSavings = cheapestSingle
+    ? singleStoreTotals[cheapestSingle].cost - optimalTotal
+    : 0;
+
+  // Banner
+  let bannerHtml = '';
+  if (Object.keys(assigned).length > 0) {
+    if (splitSavings >= tripMin && Object.keys(assigned).length > 1) {
+      bannerHtml = `<div class="sl-savings-banner">
+        💰 Splitting your trip saves <b>$${splitSavings.toFixed(2)}</b> vs shopping only at ${cheapestSingle}.
+        The list below is already sorted by best store.
+      </div>`;
+    } else if (cheapestSingle && Object.keys(assigned).length > 1) {
+      bannerHtml = `<div class="sl-savings-banner" style="background:#fef9c3;border-color:#fde047;color:#713f12">
+        👍 Splitting saves only $${splitSavings.toFixed(2)} — not worth a separate trip.
+        Just shop at <b>${cheapestSingle}</b> for everything.
+      </div>`;
+    }
+  }
+
+  // Render store sections
+  const storeColors = ['sc-0','sc-1','sc-2','sc-3','sc-4'];
+  const storeHtml = Object.entries(assigned).map(([store, items]) => {
+    const si      = db.stores.findIndex(s => s.name === store);
+    const color   = storeColors[si >= 0 ? si % 5 : 0];
+    const subtotal= items.filter(i => !i.listItem.checked).reduce((s,i) => s+i.price, 0);
+
+    const itemsHtml = items.map(i => {
+      const cheaperAt = i.allPrices
+        .filter(p => p.store !== store && p.price < i.price)
+        .sort((a,b) => a.price - b.price)[0];
+      return `
+        <div class="sl-item ${i.listItem.checked ? 'checked-off' : ''}">
+          <input type="checkbox" ${i.listItem.checked?'checked':''} onchange="toggleChecked(${i.listItem.id})">
+          <div style="flex:1;min-width:0">
+            <div class="sl-item-name">${escapeHtml(i.listItem.name)}</div>
+            ${i.matchedName !== i.listItem.name ? `<div style="font-size:11px;color:var(--gray-400)">matched: ${escapeHtml(i.matchedName)}</div>` : ''}
+            ${cheaperAt ? `<div style="font-size:11px;color:#b45309">also at ${escapeHtml(cheaperAt.store)}: $${cheaperAt.price.toFixed(2)}</div>` : ''}
+          </div>
+          <div class="sl-item-meta">$${i.price.toFixed(2)}</div>
+          <button class="icon-btn danger" onclick="removeFromList(${i.listItem.id})" style="padding:4px">
+            <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>`;
+    }).join('');
+
+    return `<div class="sl-store-section">
+      <div class="sl-store-header badge-store ${color}">
+        🏪 ${store}
+        <span class="sl-store-total">$${subtotal.toFixed(2)}</span>
+      </div>
+      ${itemsHtml}
+    </div>`;
+  }).join('');
+
+  // Unknown items
+  const unknownHtml = unknown.length
+    ? `<div style="margin-top:8px">
+        <div class="cat-head">No price data yet</div>
+        <div style="font-size:13px;color:var(--amber-600);background:var(--amber-100);border-radius:var(--radius-md);padding:8px 12px;margin-bottom:8px">
+          💡 Add prices for these items in the Prices tab to get store recommendations and cost estimates.
+        </div>
+        ${unknown.map(li => `
+          <div class="sl-item ${li.checked ? 'checked-off' : ''}">
+            <input type="checkbox" ${li.checked?'checked':''} onchange="toggleChecked(${li.id})">
+            <div class="sl-item-name" style="flex:1">${escapeHtml(li.name)}</div>
+            <div class="sl-item-meta" style="color:var(--gray-300)">—</div>
+            <button class="icon-btn danger" onclick="removeFromList(${li.id})" style="padding:4px">
+              <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>`).join('')}
+      </div>` : '';
+
+  el.innerHTML = bannerHtml + storeHtml + unknownHtml;
 }
 
-/* ───────── TABS ───────── */
+/* ── TABS ─────────────────────────────────────────────── */
 function showTab(tab) {
-  document.querySelectorAll('.tab').forEach(b =>
-    b.classList.toggle('active', b.dataset.tab === tab)
-  );
-
-  document.querySelectorAll('.section').forEach(s =>
-    s.classList.remove('active')
-  );
-
+  document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
   document.getElementById('tab-' + tab).classList.add('active');
-
-  if (tab === 'deals') renderDeals();
+  localStorage.setItem('active_tab', tab);  // nice-to-have: persist active tab
+  if (tab === 'deals')    renderDeals();
+  if (tab === 'prices')   renderPrices();
+  if (tab === 'settings') renderStores();
+  if (tab === 'list')     renderShoppingList();
+  refreshStoreSelects();
 }
-/* ───────── AI IMPORT ───────── */
 
+/* ── AI IMPORT (OpenAI) ───────────────────────────────── */
 async function handleImport(input) {
   const file = input.files[0];
   if (!file) return;
-
-  const reader = new FileReader();
-
-  reader.onload = async function(e) {
-    const base64 = e.target.result.split(',')[1];
-
+  if (file.size > 20 * 1024 * 1024) {
     document.getElementById('import-status').innerHTML =
-      "📸 Scanning image...";
+      '⚠️ Image is too large. Please use a smaller photo.';
+    input.value = '';
+    return;
+  }
 
-    try {
-      const res = await fetch("https://api.openai.com/v1/responses", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": "Bearer PLACEHOLDER_KEY"
-        },
+  document.getElementById('import-status').innerHTML =
+    '<div style="display:flex;align-items:center;gap:8px"><div class="spinner"></div> Preparing image…</div>';
+
+  // Compress image to max 1024px on longest side, JPEG quality 0.82
+  // This keeps the image clear enough for OCR while staying well under
+  // Cloudflare's free-plan 100KB body limit concern.
+  let base64;
+  try {
+    base64 = await compressImage(file, 1024, 0.82);
+  } catch(e) {
+    document.getElementById('import-status').innerHTML = '⚠️ Could not read image file.';
+    return;
+  }
+
+  const approxKB = Math.round(base64.length * 0.75 / 1024);
+  document.getElementById('import-status').innerHTML =
+    `<div style="display:flex;align-items:center;gap:8px"><div class="spinner"></div> Scanning image (${approxKB}KB)…</div>`;
+
+  try {
+      // Route through Cloudflare Worker proxy — keeps OpenAI key server-side
+      const res = await fetch('https://mad-comp-cart.basis-banker-giant.workers.dev/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: "gpt-4.1",
+          model: 'gpt-4o',
           input: [{
-            role: "user",
+            role: 'user',
             content: [
-              {
-                type: "input_text",
-                text: "Extract grocery items and prices. Ignore tax, totals, and non-product lines. Return ONLY JSON like [{name, price}]"
-              },
-              {
-                type: "input_image",
-                image_base64: base64
-              }
+              { type: 'input_text',  text: 'Extract grocery items and prices from this image. Return ONLY a JSON array with no markdown, no backticks, like: [{"name":"Item Name with size e.g. 28 oz","price":1.99}]. Include the size (oz, lb, g) in the item name if visible. Exclude totals, tax, subtotal, and change.' },
+              { type: 'input_image', image_url: `data:image/jpeg;base64,${base64}` }
             ]
           }]
         })
       });
-
       const data = await res.json();
-      const text = data.output[0].content[0].text;
-
-      let items;
-
-      try {
-        items = JSON.parse(text);
-      } catch {
-        document.getElementById('import-status').innerHTML =
-          "⚠️ Could not read items";
+      if (data.error) {
+        const msg = data.error?.message || data.error || JSON.stringify(data.error);
+        document.getElementById('import-status').innerHTML = '❌ API error: ' + escapeHtml(msg);
         return;
       }
-
-      showImportPreview(items);
-
-    } catch (err) {
-      console.error(err);
-      document.getElementById('import-status').innerHTML =
-        "❌ Scan failed";
+      let text = data.output?.[0]?.content?.[0]?.text || data.output_text || JSON.stringify(data);
+      // Strip markdown fences if model wraps response
+      text = text.replace(/```json[\s\S]*?```/g, m => m.slice(7, -3)).replace(/```[\s\S]*?```/g, m => m.slice(3,-3)).trim();
+      let items;
+      try { items = JSON.parse(text); }
+      catch {
+        // JSON parse failed — apply receipt-aware regex patterns as fallback.
+        // Handles common receipt formats: "Item Name  $1.99", "1.99 ITEM NAME",
+        // "ITEM NAME 1.99 T", "  2  ITEM NAME  3.98" (quantity × price lines).
+        items = [];
+        text.split('\n').forEach(line => {
+          line = line.trim();
+          if (!line || line.length < 3) return;
+          // Format: "Name  $1.99" or "Name 1.99"
+          let m = line.match(/^(.+?)\s+\$?(\d{1,4}\.\d{2})\s*[A-Z]?$/);
+          if (m) { items.push({ name: m[1].trim(), price: parseFloat(m[2]) }); return; }
+          // Format: "1.99  NAME" (price first)
+          m = line.match(/^\$?(\d{1,4}\.\d{2})\s+(.+)$/);
+          if (m) { items.push({ name: m[2].trim(), price: parseFloat(m[1]) }); return; }
+          // Format: "QTY NAME  TOTAL" — extract last dollar amount as price
+          m = line.match(/^(\d+\s+)?(.+?)\s+(\d{1,4}\.\d{2})\s*$/);
+          if (m && m[2].trim().length > 1) {
+            items.push({ name: m[2].trim(), price: parseFloat(m[3]) });
+          }
+        });
+      }
+      const cleaned = cleanImportedItems(items).map(item => {
+        const size = extractSize(item.name);
+        return { ...item, name: normalizeItemName(item.name), sizeOz: size?.value||null, unitPrice: size ? item.price/size.value : null };
+      });
+      if (!cleaned.length) { document.getElementById('import-status').innerHTML = '⚠️ No items detected — try another image'; return; }
+      const combined = [...(window._importItems||[]), ...cleaned];
+      window._importItems = combined.filter((item,i,self) =>
+        i === self.findIndex(x => x.name.toLowerCase()===item.name.toLowerCase() && parseFloat(x.price)===parseFloat(item.price))
+      );
+      showImportPreview(window._importItems);
+      document.getElementById('import-status').innerHTML = `✅ ${cleaned.length} item${cleaned.length!==1?'s':''} added to review list`;
+    } catch(err) {
+      logError('handleImport', err);
+      document.getElementById('import-status').innerHTML = '⚠️ Error: ' + escapeHtml(err.message);
     }
-  };
+}
 
-  reader.readAsDataURL(file);
+// Compress an image File to a base64 JPEG string.
+// maxPx: longest side in pixels. quality: JPEG quality 0–1.
+function compressImage(file, maxPx, quality) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      let { width, height } = img;
+      if (width > maxPx || height > maxPx) {
+        if (width > height) { height = Math.round(height * maxPx / width);  width  = maxPx; }
+        else                { width  = Math.round(width  * maxPx / height); height = maxPx; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width  = width;
+      canvas.height = height;
+      canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+      const dataURL = canvas.toDataURL('image/jpeg', quality);
+      resolve(dataURL.split(',')[1]);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Image load failed')); };
+    img.src = url;
+  });
+}
+
+function cleanImportedItems(items) {
+  const blacklist = ['total','tax','change','subtotal','balance','discount','savings'];
+  return (items||[]).filter(item => {
+    const name = (item.name||'').toLowerCase();
+    if (blacklist.some(w => name.includes(w))) return false;
+    if (name.length < 2) return false;
+    if (!item.price || isNaN(parseFloat(item.price))) return false;
+    return true;
+  });
+}
+
+function selectAllItems(state) {
+  (window._importItems||[]).forEach((_,i) => { const c=document.getElementById(`chk-${i}`); if(c) c.checked=state; });
+}
+
+function clearImportList() {
+  window._importItems = [];
+  document.getElementById('import-results').innerHTML = '';
+  document.getElementById('import-status').innerHTML  = '🗑️ Import list cleared';
 }
 
 function showImportPreview(items) {
-  const el = document.getElementById('import-results');
-
-  el.innerHTML = `
-    <div class="card">
-      <div class="card-title">Detected Items</div>
-
-      ${items.map(i => `
-        <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
-          <span>${i.name}</span>
-          <span>$${parseFloat(i.price).toFixed(2)}</span>
-        </div>
-      `).join('')}
-
-      <button class="btn btn-primary" onclick="confirmImport()">
-        Add Items
-      </button>
-    </div>
-  `;
-
-  window._importItems = items;
+  document.getElementById('import-results').innerHTML = `
+    <div class="card" style="margin-top:14px">
+      <div class="card-title">Review items</div>
+      <div class="btn-row" style="margin-bottom:12px">
+        <button class="btn btn-ghost btn-sm" onclick="selectAllItems(true)">Select all</button>
+        <button class="btn btn-ghost btn-sm" onclick="selectAllItems(false)">Deselect all</button>
+        <button class="btn btn-ghost btn-sm" onclick="clearImportList()">Clear list</button>
+      </div>
+      ${items.map((i,idx) => `
+        <div class="import-row">
+          <input type="checkbox" checked id="chk-${idx}">
+          <input type="text"   value="${(i.name||'').trim()||'Unknown item'}" id="name-${idx}">
+          <input type="number" value="${parseFloat(i.price).toFixed(2)}" id="price-${idx}" step="0.01">
+        </div>`).join('')}
+      <button class="btn btn-primary" style="margin-top:12px" onclick="confirmImport()">Add selected items</button>
+    </div>`;
 }
 
-window.confirmImport = function() {
-  const storeIndex = document.getElementById('i-store').value;
-  const store = db.stores[storeIndex]?.name;
+function confirmImport() {
+  const si    = document.getElementById('i-store').value;
+  const store = db.stores[si]?.name;
+  if (!store) { alert('Select a store first'); return; }
+  let added = 0;
+  const toImport = [];
+  (window._importItems||[]).forEach((item,idx) => {
+    if (!document.getElementById(`chk-${idx}`)?.checked) return;
+    const name  = document.getElementById(`name-${idx}`).value;
+    const price = parseFloat(document.getElementById(`price-${idx}`).value);
+    if (!name || isNaN(price)) return;
+    toImport.push({ name, price });
+  });
 
-  if (!store) {
-    alert("Select a store first");
-    return;
-  }
-
-  (_importItems || []).forEach(item => {
-    db.entries.push({
-      name: item.name,
-      price: parseFloat(item.price),
-      store,
-      id: Date.now() + Math.random()
+  // Item 2: all mutations inside updateDB — no pre-mutation
+  updateDB(db => {
+    toImport.forEach(({ name, price }) => {
+      const size  = extractSize(name);
+      const nname = normalizeItemName(name);
+      const existing = db.entries.find(e => e.name === nname && e.store === store);
+      if (existing) {
+        if (!existing.history) existing.history = [];
+        // Item 3: only push history if price actually changed
+        if (!existing.history.length || existing.history[0].price !== existing.price) {
+          existing.history.unshift({ price: existing.price, date: existing.date });
+        }
+        if (existing.history.length > 10) existing.history = existing.history.slice(0,10);
+        existing.price    = price;
+        existing.date     = today();
+        existing.sizeOz   = size?.value || existing.sizeOz;
+        existing.sizeUnit = size?.unit  || existing.sizeUnit;
+        existing.unitPrice = size ? price / size.value : null;
+      } else {
+        db.entries.push({
+          name: nname, price, store,
+          storeId: db.stores.find(s => s.name === store)?.id || null,  // Fix 2
+          sizeOz: size?.value||null, sizeUnit: size?.unit||null,
+          unitPrice: size ? price/size.value : null,
+          date: today(), id: newId(), history: [], cat: 'Other'
+        });
+      }
+      added++;
     });
   });
 
-  pushSync();
+  document.getElementById('import-results').innerHTML = '';
+  document.getElementById('import-status').innerHTML  = `✅ ${added} item${added!==1?'s':''} imported to ${store}`;
+  window._importItems = [];
+}
 
-  document.getElementById('import-results').innerHTML = "";
-  document.getElementById('import-status').innerHTML =
-    "✅ Imported!";
+/* ── EXPORT / IMPORT ──────────────────────────────────── */
+function exportData() {
+  const blob = new Blob([JSON.stringify(db, null, 2)], { type:'application/json' });
+  const a    = document.createElement('a');
+  a.href     = URL.createObjectURL(blob);
+  a.download = `compcart-backup-${today()}.json`;
+  a.click();
+}
+
+function exportCSV() {
+  const rows = [['Name','Store','Price','Category','Size (oz)','Unit Price ($/oz)','Date']];
+  db.entries.forEach(e => rows.push([
+    `"${e.name}"`, `"${e.store}"`, e.price.toFixed(2),
+    `"${e.cat||''}"`, e.sizeOz||'', e.unitPrice?e.unitPrice.toFixed(4):'', e.date||''
+  ]));
+  const blob = new Blob([rows.map(r=>r.join(',')).join('\n')], { type:'text/csv' });
+  const a    = document.createElement('a');
+  a.href     = URL.createObjectURL(blob);
+  a.download = `compcart-prices-${today()}.csv`;
+  a.click();
+}
+
+function importBackup(input) {
+  const file = input.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!data.stores || !data.entries) throw new Error('Invalid file');
+      if (!confirm(`Import ${data.entries.length} entries and ${data.stores.length} stores?\nThis will REPLACE your current data.`)) return;
+      db = data;
+      shoppingList = db.shoppingList || [];
+      updateDB(() => {}); // triggers invalidateCache + pushSync with restored data
+      toast('Backup restored!');
+    } catch(err) { alert('Could not read backup file: ' + err.message); }
+  };
+  reader.readAsText(file);
+}
+
+/* ── TOAST ────────────────────────────────────────────── */
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2400);
+}
+
+/* ── INIT ─────────────────────────────────────────────── */
+// Expose globals for inline onclick handlers
+window.showTab        = showTab;
+window.addEntry       = addEntry;
+window.addStore       = addStore;
+window.removeEntry    = removeEntry;
+window.removeStore    = removeStore;
+window.confirmImport  = confirmImport;
+window.selectAllItems = selectAllItems;
+window.clearImportList= clearImportList;
+window.handleImport   = handleImport;
+window.checkFuzzy     = checkFuzzy;
+window.acceptFuzzy    = acceptFuzzy;
+window.addToList      = addToList;
+window.clearChecked   = clearChecked;
+window.clearAllList   = clearAllList;
+window.showSlSuggestions = showSlSuggestions;
+window.updateTripLabel= updateTripLabel;
+window.exportData     = exportData;
+window.exportCSV      = exportCSV;
+window.importBackup   = importBackup;
+window.toggleChecked  = toggleChecked;
+window.removeFromList = removeFromList;
+window.toggleHistory  = toggleHistory;
+window.startEdit      = startEdit;
+window.saveEdit       = saveEdit;
+window.cancelEdit     = cancelEdit;
+
+// Bug 3: delegated safe handler for add-to-list buttons — reads data-name,
+// never evaluates user input as JS code
+document.addEventListener('click', e => {
+  const btn = e.target.closest('.add-to-list-btn');
+  if (btn) addToListByName(btn.dataset.name || '');
+});
+
+// Restore trip threshold label from persisted value
+const _savedTripMin = localStorage.getItem('trip_min');
+if (_savedTripMin) {
+  const tripEl = document.getElementById('trip-min');
+  const labelEl = document.getElementById('trip-label');
+  if (tripEl) tripEl.value = _savedTripMin;
+  if (labelEl) labelEl.textContent = '$' + parseFloat(_savedTripMin).toFixed(2);
+}
+
+// Restore active tab
+const _savedTab = localStorage.getItem('active_tab') || 'prices';
+showTab(_savedTab);
+
+// Fix 3: sync pricing mode button to persisted state on startup.
+// togglePricingMode() flips the mode, so calling it twice returns to the saved
+// state while forcing the correct label and styling to render.
+// Only needed when saved mode is 'unit' (default 'total' is already correct).
+if (_pricingMode === 'unit') {
+  togglePricingMode(); // → 'total' (wrong, but forces label render)
+  togglePricingMode(); // → 'unit'  (correct, label now reads '$/unit — ON')
+}
+
+// Nice-to-have: Enter key on price field triggers addEntry
+document.getElementById('p-price')?.addEventListener('keydown', e => {
+  if (e.key === 'Enter') addEntry();
+});
+
+// Nice-to-have: flashCard — call after updateDB in save flows
+// Already defined above; wired here so it fires after render settles
+function flashCardAfterRender(id) {
+  setTimeout(() => flashCard(id), 80);
+}
+window.flashCardAfterRender = flashCardAfterRender;
+
+/* ══════════════════════════════════════════════════════════
+ * BARCODE SCANNING — ZXing BrowserMultiFormatReader + Open Food Facts
+ * ══════════════════════════════════════════════════════════
+ *
+ * Uses the high-level BrowserMultiFormatReader which manages the
+ * camera stream and decode loop internally — much simpler and more
+ * reliable than the manual requestAnimationFrame approach.
+ *
+ * Flow:
+ *  1. startScanner()   → BrowserMultiFormatReader.decodeFromVideoDevice()
+ *  2. On decode        → stopScanner(), lookupUPC(code)
+ *  3. lookupUPC()      → Open Food Facts (free, no API key)
+ *  4. Found            → showScanResult(), user types price, addScannedItem()
+ *  5. Not found        → showNotFound(), user types name+price, addNotFoundItem()
+ *  6. scanAnother()    → reset + restart scanner
+ */
+
+let _codeReader  = null;
+let _lastScanned = null;
+let _scanCooldown = false;  // Bug 7: prevents duplicate lookups on rapid re-reads
+let _importMode  = 'scan';
+
+function setImportMode(mode) {
+  _importMode = mode;
+  document.getElementById('panel-scan').style.display  = mode === 'scan'  ? '' : 'none';
+  document.getElementById('panel-photo').style.display = mode === 'photo' ? '' : 'none';
+  document.getElementById('mode-scan-btn').className   = mode === 'scan'  ? 'btn btn-primary' : 'btn btn-ghost';
+  document.getElementById('mode-photo-btn').className  = mode === 'photo' ? 'btn btn-primary' : 'btn btn-ghost';
+  if (mode === 'photo') stopScanner();
+}
+window.setImportMode = setImportMode;
+
+async function startScanner() {
+  const video  = document.getElementById('scan-video');
+  const vf     = document.getElementById('scan-viewfinder');
+  const btn    = document.getElementById('scan-btn');
+  const status = document.getElementById('scan-status');
+
+  hideScanPanels();
+  _lastScanned = null;
+
+  // Check ZXing loaded
+  if (typeof ZXingBrowser === 'undefined' || !ZXingBrowser.BrowserMultiFormatReader) {
+    status.innerHTML = '<div style="color:var(--red-600);font-size:14px">⚠️ Barcode library failed to load. Check your internet connection and reload the page.</div>';
+    return;
+  }
+
+  status.innerHTML = '<div style="display:flex;align-items:center;gap:8px"><div class="spinner"></div><span style="font-size:14px;color:var(--gray-500)">Starting camera…</span></div>';
+
+  try {
+    stopScanner(); // clean up any previous instance
+
+    _codeReader = new ZXingBrowser.BrowserMultiFormatReader();
+
+    // Get available video devices and prefer rear camera
+    const devices = await ZXingBrowser.BrowserCodeReader.listVideoInputDevices();
+    const rearDevice = devices.find(d =>
+      d.label.toLowerCase().includes('back') ||
+      d.label.toLowerCase().includes('rear') ||
+      d.label.toLowerCase().includes('environment')
+    );
+    const deviceId = rearDevice ? rearDevice.deviceId : (devices[0]?.deviceId || undefined);
+
+    vf.style.display  = 'block';
+    btn.style.display = 'none';
+    status.innerHTML  = '';
+
+    await _codeReader.decodeFromVideoDevice(deviceId, video, (result, err) => {
+      if (!result) return;
+      const code = result.getText();
+      // Bug 7: cooldown prevents firing multiple lookups if scanner re-reads same barcode
+      if (!code || code === _lastScanned || _scanCooldown) return;
+      _lastScanned  = code;
+      _scanCooldown = true;
+      setTimeout(() => { _scanCooldown = false; }, 1500);
+      stopScanner();
+      lookupUPC(code);
+    });
+
+  } catch(err) {
+    logError('startScanner', err);
+    vf.style.display  = 'none';
+    btn.style.display = 'block';
+    status.innerHTML  = `<div style="color:var(--red-600);font-size:14px">⚠️ Camera error: ${escapeHtml(err.message)}.<br>Make sure your browser has camera permission and try again.</div>`;
+  }
+}
+window.startScanner = startScanner;
+
+function stopScanner() {
+  if (_codeReader) {
+    try { _codeReader.reset(); } catch(e) {}
+    _codeReader = null;
+  }
+  const vf  = document.getElementById('scan-viewfinder');
+  const btn = document.getElementById('scan-btn');
+  if (vf)  vf.style.display  = 'none';
+  if (btn) btn.style.display = 'block';
+}
+window.stopScanner = stopScanner;
+
+/* ── OPEN FOOD FACTS LOOKUP ──────────────────────────── */
+async function lookupUPC(upc) {
+  if (!upc) return;
+  // Item 14: use padStart for robust UPC normalization
+  // handles 8-digit EAN-8, 11-digit UPC-A with dropped leading zero, 12-digit UPC-A, 13-digit EAN-13
+  upc = upc.replace(/[\s\-]/g, '');
+  if (upc.length <= 12 && upc.length >= 11) upc = upc.padStart(12, '0');
+  // EAN-13 (13 digits) — leave as-is; Open Food Facts handles both
+
+  const status = document.getElementById('scan-status');
+  hideScanPanels();
+  status.innerHTML = `<div style="display:flex;align-items:center;gap:8px"><div class="spinner"></div><span style="font-size:14px;color:var(--gray-500)">Looking up UPC ${upc}…</span></div>`;
+
+  try {
+    const res  = await fetch(`https://world.openfoodfacts.org/api/v0/product/${upc}.json`);
+    const data = await res.json();
+
+    status.innerHTML = '';
+
+    if (data.status !== 1 || !data.product) {
+      showNotFound(upc);
+      return;
+    }
+
+    const p     = data.product;
+    const name  = p.product_name_en || p.product_name || p.generic_name_en || p.generic_name || '';
+    const brand = p.brands || '';
+    const qty   = p.quantity || '';
+    const img   = p.image_small_url || p.image_thumb_url || '';
+    let itemName = [brand, name, qty].filter(Boolean).join(' ').trim() || `UPC ${upc}`;
+    const cat   = guessCategoryFromOFF(p);
+
+    showScanResult({ itemName, brand, qty, img, cat });
+
+  } catch(err) {
+    logError('lookupUPC', err);
+    document.getElementById('scan-status').innerHTML =
+      `<div style="color:var(--red-600);font-size:14px">⚠️ Lookup failed: ${escapeHtml(err.message)}</div>`;
+  }
+}
+window.lookupUPC = lookupUPC;
+
+function guessCategoryFromOFF(product) {
+  const tags     = (product.categories_tags || []).join(' ').toLowerCase();
+  const combined = tags + ' ' + (product.product_name || '').toLowerCase();
+  if (/dairy|milk|cheese|yogurt|cream|butter/.test(combined))       return 'Dairy';
+  if (/meat|beef|chicken|pork|seafood|fish|poultry/.test(combined)) return 'Meat & Seafood';
+  if (/frozen/.test(combined))                                       return 'Frozen';
+  if (/bread|bakery|biscuit|cookie|cracker|cereal/.test(combined))  return 'Bakery';
+  if (/beverage|juice|soda|water|drink|tea|coffee/.test(combined))  return 'Beverages';
+  if (/snack|chip|pretzel|popcorn|candy|chocolate/.test(combined))  return 'Snacks';
+  if (/fruit|vegetable|produce|fresh/.test(combined))               return 'Produce';
+  return 'Pantry';
+}
+
+function showScanResult({ itemName, brand, qty, img, cat }) {
+  document.getElementById('scan-result').style.display    = '';
+  document.getElementById('scan-name-input').value        = normalizeItemName(itemName);
+  document.getElementById('scan-price-input').value       = '';
+  document.getElementById('scan-product-name').textContent = itemName || '—';
+  document.getElementById('scan-product-brand').textContent = brand ? `Brand: ${brand}` : '';
+  document.getElementById('scan-product-size').textContent  = qty   ? `Size: ${qty}`    : '';
+
+  const catSel = document.getElementById('scan-cat-input');
+  for (let i = 0; i < catSel.options.length; i++) {
+    if (catSel.options[i].value === cat) { catSel.selectedIndex = i; break; }
+  }
+  const thumb = document.getElementById('scan-thumb');
+  if (img) { thumb.src = img; thumb.style.display = 'block'; }
+  else        thumb.style.display = 'none';
+
+  setTimeout(() => document.getElementById('scan-price-input').focus(), 100);
+}
+
+function showNotFound(upc) {
+  document.getElementById('scan-notfound').style.display = '';
+  document.getElementById('nf-name-input').value         = '';
+  document.getElementById('nf-price-input').value        = '';
+  setTimeout(() => document.getElementById('nf-name-input').focus(), 100);
+}
+
+function hideScanPanels() {
+  document.getElementById('scan-result').style.display   = 'none';
+  document.getElementById('scan-notfound').style.display = 'none';
+}
+
+/* ── ADD SCANNED ITEM ────────────────────────────────── */
+function addScannedItem() {
+  const name  = document.getElementById('scan-name-input').value.trim();
+  const price = parseFloat(document.getElementById('scan-price-input').value);
+  const cat   = document.getElementById('scan-cat-input').value;
+  const si    = document.getElementById('i-store').value;
+  const store = db.stores[parseInt(si)]?.name;
+
+  if (!store)  return toast('Select a store first');
+
+  const vScan = validateItem(name, price);
+  if (!vScan.ok) return toast(vScan.error);
+
+  _lastStore = store;
+  _lastCat   = cat;
+  localStorage.setItem('last_store', store);
+  localStorage.setItem('last_cat',   cat);
+
+  const size     = extractSize(name);
+  const normName = normalizeItemName(name);
+
+  // Bug 2 fix: ALL mutations inside updateDB — no pre-mutation outside
+  updateDB(db => {
+    const existing = db.entries.find(e => e.name === normName && e.store === store);
+    if (existing) {
+      if (!existing.history) existing.history = [];
+      // History dedup guard
+      if (!existing.history.length || existing.history[0].price !== existing.price) {
+        existing.history.unshift({ price: existing.price, date: existing.date });
+      }
+      if (existing.history.length > 10) existing.history = existing.history.slice(0, 10);
+      existing.price     = price;
+      existing.date      = today();
+      existing.sizeOz    = size ? size.value : existing.sizeOz;
+      existing.sizeUnit  = size ? size.unit  : existing.sizeUnit;
+      existing.unitPrice = size ? price / size.value : null;
+      existing.cat       = cat;
+    } else {
+      db.entries.push({
+        name: normName, price, store, cat,
+        storeId:   db.stores.find(s => s.name === store)?.id || null,  // Fix 2
+        sizeOz:    size ? size.value : null,
+        sizeUnit:  size ? size.unit  : null,
+        unitPrice: size ? price / size.value : null,
+        date: today(), id: newId(), history: []
+      });
+    }
+  });
+
+  toast(`✓ ${escapeHtml(normName)} added to ${escapeHtml(store)}`);
+  scanAnother();
+}
+window.addScannedItem = addScannedItem;
+
+function addNotFoundItem() {
+  const name  = document.getElementById('nf-name-input').value.trim();
+  const price = parseFloat(document.getElementById('nf-price-input').value);
+  const cat   = document.getElementById('nf-cat-input').value;
+  const si    = document.getElementById('i-store').value;
+  const store = db.stores[parseInt(si)]?.name;
+
+  if (!store)  return toast('Select a store first');
+
+  const vNf = validateItem(name, price);
+  if (!vNf.ok) return toast(vNf.error);
+
+  _lastStore = store;
+  localStorage.setItem('last_store', store);
+  const size     = extractSize(name);
+  const normName = normalizeItemName(name);
+
+  updateDB(db => {
+    db.entries.push({
+      name: normName, price, store, cat,
+      storeId:   db.stores.find(s => s.name === store)?.id || null,  // Fix 2
+      sizeOz:    size ? size.value : null,
+      sizeUnit:  size ? size.unit  : null,
+      unitPrice: size ? price / size.value : null,
+      date: today(), id: newId(), history: []
+    });
+  });
+  toast(`✓ ${escapeHtml(normName)} added`);
+  scanAnother();
+}
+window.addNotFoundItem = addNotFoundItem;
+
+function scanAnother() {
+  _lastScanned = null;
+  hideScanPanels();
+  document.getElementById('scan-status').innerHTML = '';
+  document.getElementById('manual-upc').value = '';
+  startScanner();
+}
+window.scanAnother = scanAnother;
+
+// Stop scanner when navigating away from import tab
+const _origShowTab = showTab;
+window.showTab = function(tab) {
+  if (tab !== 'import') stopScanner();
+  _origShowTab(tab);
 };
 
-/* ✅ MAKE FUNCTION AVAILABLE TO HTML */
-window.handleImport = handleImport;
+/* ══════════════════════════════════════════════════════════
+ * ITEM 7: PRICE HISTORY CHART (Chart.js modal)
+ * ITEM 8: PRICE DROP ALERT
+ * ══════════════════════════════════════════════════════════
+ *
+ * openChartModal(entry) — opens a bottom-sheet with a line chart
+ * of current + history prices for that item/store combo.
+ * Range buttons (30d / 90d / 1yr / All) filter the data.
+ * Price drop alert fires if newest price < 80% of historical average.
+ */
 
-/* ✅ DATE */
-document.getElementById('p-date').value =
-  new Date().toISOString().slice(0,10);
+let _chartInstance = null;
+let _chartEntry    = null;
+let _chartRange    = 30;
+
+function openChartModal(id) {
+  const entry = db.entries.find(e => e.id === id);
+  if (!entry) return;
+  _chartEntry = entry;
+  _chartRange = 30;
+
+  document.getElementById('chart-modal-title').textContent =
+    `${entry.name} — ${entry.store}`;
+  document.getElementById('chart-modal').classList.remove('hidden');
+
+  // Reset range buttons
+  document.querySelectorAll('.chart-range button').forEach(b =>
+    b.classList.toggle('active', parseInt(b.dataset.range) === _chartRange)
+  );
+
+  renderChart();
+}
+window.openChartModal = openChartModal;
+
+function closeChartModal(e) {
+  // Close if backdrop clicked (not the sheet itself)
+  if (e && e.target !== document.getElementById('chart-modal')) return;
+  document.getElementById('chart-modal').classList.add('hidden');
+  if (_chartInstance) { _chartInstance.destroy(); _chartInstance = null; }
+}
+window.closeChartModal = closeChartModal;
+
+function setChartRange(days) {
+  _chartRange = days;
+  document.querySelectorAll('.chart-range button').forEach(b =>
+    b.classList.toggle('active', parseInt(b.dataset.range) === days)
+  );
+  renderChart();
+}
+window.setChartRange = setChartRange;
+
+function renderChart() {
+  if (!_chartEntry) return;
+
+  // Build chronological data points: history (oldest→newest) + current
+  const rawPoints = [];
+  if (_chartEntry.history && _chartEntry.history.length) {
+    [..._chartEntry.history].reverse().forEach(h => {
+      if (h.date && h.price != null) rawPoints.push({ date: h.date, price: parseFloat(h.price) });
+    });
+  }
+  rawPoints.push({ date: _chartEntry.date || today(), price: _chartEntry.price });
+
+  // Filter by selected range
+  const cutoff = _chartRange > 0
+    ? new Date(Date.now() - _chartRange * 86400000).toISOString().slice(0,10)
+    : '0000-00-00';
+  const points = rawPoints.filter(p => p.date >= cutoff);
+  if (!points.length) points.push(...rawPoints); // fallback: show all
+
+  const labels = points.map(p => p.date);
+  const data   = points.map(p => p.price);
+  const minP   = Math.min(...data);
+  const maxP   = Math.max(...data);
+  const avgP   = data.reduce((a,b) => a+b, 0) / data.length;
+  const latest = data[data.length - 1];
+
+  // Item 7: compare vs recent trend (last 5 points), not full history
+  // avoids ancient price skewing the alert threshold
+  const recentData  = data.slice(-5);
+  const recentAvg   = recentData.reduce((a,b) => a+b, 0) / recentData.length;
+  const dropBanner  = document.getElementById('chart-drop-banner');
+  if (data.length > 2 && latest < recentAvg * 0.85) {
+    const savePct = ((1 - latest / recentAvg) * 100).toFixed(0);
+    dropBanner.textContent = `📉 Price drop! ${savePct}% below recent trend — good time to stock up.`;
+    dropBanner.style.display = '';
+  } else {
+    dropBanner.style.display = 'none';
+  }
+
+  // Stats row
+  document.getElementById('chart-stats').innerHTML = `
+    <div style="background:var(--green-50);border-radius:var(--radius-md);padding:8px">
+      <div style="font-size:18px;font-weight:600;color:var(--green-800)">$${minP.toFixed(2)}</div>
+      <div style="color:var(--gray-500)">Low</div>
+    </div>
+    <div style="background:var(--gray-50);border-radius:var(--radius-md);padding:8px">
+      <div style="font-size:18px;font-weight:600">$${avgP.toFixed(2)}</div>
+      <div style="color:var(--gray-500)">Average</div>
+    </div>
+    <div style="background:${latest === minP ? 'var(--green-50)' : 'var(--red-50)'};border-radius:var(--radius-md);padding:8px">
+      <div style="font-size:18px;font-weight:600;color:${latest === minP ? '#166534' : 'var(--red-600)'}">$${latest.toFixed(2)}</div>
+      <div style="color:var(--gray-500)">Current</div>
+    </div>`;
+
+  // Draw chart — Fix 4: guard ctx in case modal was closed before render completed
+  const canvas = document.getElementById('price-chart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  if (_chartInstance) { _chartInstance.destroy(); _chartInstance = null; }
+  _chartInstance = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Price',
+        data,
+        borderColor: '#1e5c34',
+        backgroundColor: 'rgba(30,92,52,0.08)',
+        pointBackgroundColor: data.map(p =>
+          p === minP ? '#166534' : p === maxP ? '#c0392b' : '#1e5c34'
+        ),
+        pointRadius: data.map(p => p === minP || p === maxP ? 6 : 3),
+        tension: 0.3,
+        fill: true,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => `$${ctx.parsed.y.toFixed(2)}`
+          }
+        }
+      },
+      scales: {
+        y: {
+          ticks: { callback: v => '$' + v.toFixed(2) },
+          grid: { color: 'rgba(0,0,0,0.05)' }
+        },
+        x: {
+          ticks: { maxTicksLimit: 6, maxRotation: 0 },
+          grid: { display: false }
+        }
+      }
+    }
+  });
+}
+
+/* ══════════════════════════════════════════════════════════
+ * ITEM 12: DUPLICATE MERGE TOOL
+ * Detects item names that are fuzzy-similar, groups them,
+ * lets the user pick the canonical name, then renames all
+ * entries in the other group(s) to match.
+ */
+
+function openMergeModal() {
+  const modal = document.getElementById('merge-modal');
+  modal.classList.remove('hidden');
+
+  const names    = [...new Set(db.entries.map(e => e.name))];
+  const groups   = []; // [ [name1, name2, ...], ... ]
+  const assigned = new Set();
+
+  names.forEach(a => {
+    if (assigned.has(a)) return;
+    const group = [a];
+    names.forEach(b => {
+      if (b === a || assigned.has(b)) return;
+      if (fuzzyMatch(a.toLowerCase(), b.toLowerCase())) {
+        group.push(b);
+        assigned.add(b);
+      }
+    });
+    if (group.length > 1) {
+      assigned.add(a);
+      groups.push(group);
+    }
+  });
+
+  const groupsEl = document.getElementById('merge-groups');
+  const noneEl   = document.getElementById('merge-none');
+
+  if (!groups.length) {
+    groupsEl.innerHTML = '';
+    noneEl.style.display = '';
+    return;
+  }
+  noneEl.style.display = 'none';
+
+  groupsEl.innerHTML = groups.map((group, gi) => {
+    const counts = group.map(n => ({
+      name: n,
+      count: db.entries.filter(e => e.name === n).length
+    }));
+    return `<div class="merge-group">
+      <div class="merge-group-title">Group ${gi+1} — ${group.length} similar names</div>
+      ${counts.map((c,i) => `
+        <label class="merge-name-opt">
+          <input type="radio" name="merge-${gi}" value="${c.name.replace(/"/g,'&quot;')}" ${i===0?'checked':''}>
+          <span style="flex:1">${c.name}</span>
+          <span style="color:var(--gray-400);font-size:12px">${c.count} entr${c.count===1?'y':'ies'}</span>
+        </label>`).join('')}
+      <button class="btn btn-primary btn-sm" onclick="executeMerge(${gi})" style="margin-top:10px;width:auto">
+        Merge into selected name
+      </button>
+    </div>`;
+  }).join('');
+
+  // Store groups for executeMerge
+  window._mergeGroups = groups;
+}
+window.openMergeModal = openMergeModal;
+
+function executeMerge(gi) {
+  const group     = window._mergeGroups[gi];
+  const radio     = document.querySelector(`input[name="merge-${gi}"]:checked`);
+  if (!radio) return;
+  const canonical = radio.value;
+  const others    = group.filter(n => n !== canonical);
+
+  if (!confirm(`Rename all entries for:\n${others.join('\n')}\n\n→ "${canonical}"\n\nThis cannot be undone.`)) return;
+
+  updateDB(db => {
+    db.entries.forEach(e => {
+      if (others.includes(e.name)) e.name = canonical;
+    });
+  });
+
+  toast(`Merged ${others.length} name${others.length===1?'':'s'} into "${canonical}"`);
+  openMergeModal(); // refresh modal
+}
+window.executeMerge = executeMerge;
+
+function closeMergeModal(e) {
+  if (e && e.target !== document.getElementById('merge-modal')) return;
+  document.getElementById('merge-modal').classList.add('hidden');
+}
+window.closeMergeModal = closeMergeModal;
+
+document.getElementById('p-date').value = today();
 
 </script>
 </body>
