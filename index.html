@@ -2092,7 +2092,14 @@ function buildCache() {
 
 function staleDays(dateStr) {
   if (!dateStr) return 0;
-  return (Date.now() - new Date(dateStr)) / 86400000;
+  // Compare as date strings to avoid UTC-vs-local timezone offset bug.
+  // new Date('YYYY-MM-DD') parses as UTC midnight which is yesterday evening
+  // in US timezones, making entries appear fresher than they are.
+  const entryDate = dateStr.slice(0, 10);  // 'YYYY-MM-DD'
+  const todayStr  = today();               // 'YYYY-MM-DD' in local time
+  if (entryDate === todayStr) return 0;
+  // For older entries, compute approximate days via timestamps
+  return (Date.now() - new Date(dateStr + 'T12:00:00')) / 86400000;
 }
 
 function getCache() {
