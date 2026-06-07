@@ -166,7 +166,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--green-60
 .sc-4{background:#ede9fe;color:#4c1d95}
 
 /* PRICE ENTRY CARD */
-.entry-card{background:var(--white);border:1px solid var(--gray-100);border-radius:var(--radius-md);padding:12px 14px;margin-bottom:8px;display:flex;align-items:flex-start;gap:10px}
+.entry-card{background:var(--white);border:1px solid var(--gray-100);border-radius:var(--radius-md);padding:12px 14px;margin-bottom:8px;display:flex;flex-wrap:wrap;align-items:flex-start;gap:10px}
 .entry-card.is-best{border-left:3px solid #4ade80}
 .entry-card.is-stale{opacity:0.65}
 .entry-main{flex:1;min-width:0}
@@ -181,16 +181,16 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--green-60
 .icon-btn.success{color:var(--green-600)}
 .icon-btn svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 
-/* INLINE EDIT — stacks vertically on mobile for easier tapping */
-.edit-overlay{background:var(--green-50);border:1.5px solid var(--green-400);border-radius:var(--radius-md);padding:12px;margin-bottom:8px;display:none}
+/* INLINE EDIT — full width by breaking out of the flex row */
+.edit-overlay{width:100%;flex-basis:100%;background:var(--green-50);border:1.5px solid var(--green-400);border-radius:var(--radius-md);padding:14px;display:none;box-sizing:border-box}
 .edit-overlay.open{display:block}
-.edit-row{display:grid;grid-template-columns:1fr;gap:8px}
-.edit-row input,.edit-row select{width:100%;padding:10px 12px;font-size:16px;border:1.5px solid var(--gray-300);border-radius:var(--radius-sm);font-family:var(--font-body)}
-.edit-date-row{display:flex;align-items:center;gap:8px;margin-top:4px}
-.edit-date-row label{font-size:13px;color:var(--gray-500);white-space:nowrap;flex-shrink:0}
-.edit-date-row input{flex:1;padding:10px 12px;font-size:16px;border:1.5px solid var(--gray-300);border-radius:var(--radius-sm);font-family:monospace}
-.edit-actions{display:flex;gap:8px;margin-top:8px}
-.edit-actions button{flex:1;padding:12px;font-size:15px}
+.edit-row{display:grid;grid-template-columns:1fr;gap:10px}
+.edit-row input,.edit-row select{width:100%;padding:12px 14px;font-size:16px;border:1.5px solid var(--gray-300);border-radius:var(--radius-sm);font-family:var(--font-body);box-sizing:border-box;background:var(--white)}
+.edit-date-row{display:flex;align-items:center;gap:10px;margin-top:4px}
+.edit-date-row label{font-size:13px;color:var(--gray-500);white-space:nowrap;flex-shrink:0;min-width:fit-content}
+.edit-date-row input{flex:1;width:100%;padding:12px 14px;font-size:16px;border:1.5px solid var(--gray-300);border-radius:var(--radius-sm);font-family:monospace;background:var(--white);box-sizing:border-box}
+.edit-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+.edit-actions button{padding:14px;font-size:15px;font-weight:500}
 
 /* HISTORY PANEL */
 .history-panel{background:var(--gray-50);border-radius:var(--radius-md);padding:10px;margin-top:6px;display:none}
@@ -1392,25 +1392,31 @@ function localLoad() {
   } catch(e) { logError('localLoad', e); }
 }
 
-function pushSync() {
+function pushSync(immediate) {
   db.shoppingList = shoppingList;
   localSave();
-  // Don't attempt Firebase write until authenticated
   if (!firebase.auth().currentUser) { _pendingSync = true; return; }
   if (!navigator.onLine) {
     _pendingSync = true;
     showOfflineBanner(true);
     return;
   }
+  // immediate=true skips debounce — used for critical saves like entry edits
   clearTimeout(_syncTimer);
+  const delay = immediate ? 0 : 300;
   _syncTimer = setTimeout(() => {
     dbRef.update({
       stores:          db.stores,
       entries:         db.entries,
       shoppingList:    db.shoppingList,
       _schemaVersion:  CURRENT_SCHEMA_VERSION
-    }).catch(err => { _pendingSync = true; logError('pushSync', err); });
-  }, 300);
+    }).then(() => {
+      _pendingSync = false;
+    }).catch(err => {
+      _pendingSync = true;
+      logError('pushSync', err);
+    });
+  }, delay);
 }
 
 window.addEventListener('online', () => {
@@ -1559,12 +1565,12 @@ document.addEventListener('keydown', e => {
  *   updateDB(db => { db.entries.push(newEntry); });
  *   updateDB(db => { db.stores = db.stores.filter(...); });
  */
-function updateDB(fn) {
+function updateDB(fn, immediate) {
   fn(db);
   shoppingList = db.shoppingList || shoppingList;
   invalidateCache();
-  refreshAll();  // re-render UI immediately from local state — don't wait for Firebase round-trip
-  pushSync();    // then sync to Firebase in background
+  refreshAll();
+  pushSync(immediate);
 }
 
 /* ── STORES ───────────────────────────────────────────── */
@@ -2049,7 +2055,7 @@ function saveEdit(id) {
     e.sizeOz    = size ? size.value : e.sizeOz;
     e.sizeUnit  = size ? size.unit  : e.sizeUnit;
     e.unitPrice = size ? newPrice / size.value : null;
-  });
+  }, true); // immediate=true — don't debounce, write to Firebase right away
   toast('Updated!');
   setTimeout(() => flashCard(sid), 80);
 }
