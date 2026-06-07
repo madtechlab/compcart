@@ -2003,15 +2003,13 @@ function saveEdit(id) {
   if (!entry) return;
   const newPrice = parseFloat(document.getElementById('ep-' + id).value);
   const newName  = document.getElementById('en-' + id).value.trim();
-  // Improvement 2: read category from inline edit dropdown
   const newCat   = document.getElementById('ec-' + id)?.value || entry.cat || 'Other';
-  // Bug 1 fix: cat was undefined — read from entry or dropdown
+  const newDate  = document.getElementById('ed-' + id)?.value || today();
   const cat      = newCat;
 
   if (isNaN(newPrice) || newPrice < 0) return toast('Invalid price');
   if (!newName) return toast('Name cannot be empty');
 
-  // Bug 4 fix: guard divide-by-zero when existing price is 0
   const pctChange = entry.price > 0
     ? Math.abs((newPrice - entry.price) / entry.price)
     : 0;
@@ -2026,7 +2024,6 @@ function saveEdit(id) {
     if (!ok) return;
   }
 
-  // Item 10: persist last-used category
   _lastCat = cat;
   localStorage.setItem('last_cat', cat);
 
@@ -2034,7 +2031,7 @@ function saveEdit(id) {
     const e = db.entries.find(x => x.id === id);
     if (!e) return;
     if (!e.history) e.history = [];
-    // Item 3: only record history when price actually changed
+    // Only push history if price actually changed
     if (!e.history.length || e.history[0].price !== e.price) {
       e.history.unshift({ price: e.price, date: e.date });
     }
@@ -2043,7 +2040,7 @@ function saveEdit(id) {
     e.price     = newPrice;
     e.name      = normalizeItemName(newName);
     e.cat       = cat;
-    e.date      = today();
+    e.date      = newDate;   // use date from edit field, not always today()
     e.sizeOz    = size ? size.value : e.sizeOz;
     e.sizeUnit  = size ? size.unit  : e.sizeUnit;
     e.unitPrice = size ? newPrice / size.value : null;
@@ -2349,6 +2346,10 @@ function entryCardHtml(e, cache) {
           <input type="text"   id="en-${e.id}" value="${safeName}" style="flex:2">
           <input type="number" id="ep-${e.id}" value="${e.price.toFixed(2)}" step="0.01" style="width:90px">
           <select id="ec-${e.id}" style="font-size:13px;padding:7px 8px;flex:1;min-width:100px">${catOpts}</select>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:6px">
+          <label style="font-size:12px;color:var(--gray-500);white-space:nowrap">Date:</label>
+          <input type="date" id="ed-${e.id}" value="${e.date||''}" style="flex:1;font-size:13px;padding:7px 10px">
         </div>
         <div style="display:flex;gap:6px;margin-top:6px">
           <button class="btn btn-primary btn-sm" onclick="saveEdit(${eid})" style="width:auto">Save</button>
