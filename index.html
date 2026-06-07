@@ -1555,9 +1555,10 @@ document.addEventListener('keydown', e => {
  */
 function updateDB(fn) {
   fn(db);
-  shoppingList = db.shoppingList || shoppingList; // keep mirror in sync
+  shoppingList = db.shoppingList || shoppingList;
   invalidateCache();
-  pushSync();
+  refreshAll();  // re-render UI immediately from local state — don't wait for Firebase round-trip
+  pushSync();    // then sync to Firebase in background
 }
 
 /* ── STORES ───────────────────────────────────────────── */
