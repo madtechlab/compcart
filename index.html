@@ -1600,15 +1600,71 @@ function renderStores() {
   const el = document.getElementById('stores-list');
   if (!db.stores.length) { el.innerHTML = '<div style="font-size:14px;color:var(--gray-400)">No stores yet.</div>'; return; }
   el.innerHTML = db.stores.map((s, i) => `
-    <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--gray-100)">
-      <span class="badge-store sc-${i % 5}">${escapeHtml(s.name)}</span>
-      <span style="font-size:13px;color:var(--gray-400);flex:1">${escapeHtml(s.loc || '')}</span>
-      <span style="font-size:12px;color:var(--gray-400)">${db.entries.filter(e => e.storeId ? e.storeId === s.id : e.store === s.name).length} prices</span>
-      <button class="icon-btn danger" onclick="removeStore(${s.id})" title="Remove store">
-        <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6M10 11v6M14 11v6"/></svg>
-      </button>
+    <div style="border-bottom:1px solid var(--gray-100)">
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 0">
+        <span class="badge-store sc-${i % 5}">${escapeHtml(s.name)}</span>
+        <span style="font-size:13px;color:var(--gray-400);flex:1">${escapeHtml(s.loc || '')}</span>
+        <span style="font-size:12px;color:var(--gray-400)">${db.entries.filter(e => e.storeId ? e.storeId === s.id : e.store === s.name).length} prices</span>
+        <button class="icon-btn" onclick="toggleRenameStore(${s.id})" title="Rename store">
+          <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        </button>
+        <button class="icon-btn danger" onclick="removeStore(${s.id})" title="Remove store">
+          <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6M10 11v6M14 11v6"/></svg>
+        </button>
+      </div>
+      <!-- Inline rename field — hidden by default -->
+      <div id="rename-${s.id}" style="display:none;padding:0 0 10px;display:none">
+        <div style="display:flex;gap:8px;align-items:center">
+          <input type="text" id="rename-input-${s.id}" value="${escapeHtml(s.name)}"
+            style="flex:1;font-size:14px;padding:8px 10px"
+            onkeydown="if(event.key==='Enter')saveRenameStore(${s.id});if(event.key==='Escape')toggleRenameStore(${s.id})">
+          <button class="btn btn-primary btn-sm" onclick="saveRenameStore(${s.id})" style="width:auto">Save</button>
+          <button class="btn btn-ghost btn-sm" onclick="toggleRenameStore(${s.id})" style="width:auto">✕</button>
+        </div>
+        <div style="font-size:12px;color:var(--gray-500);margin-top:4px">All prices for this store will update automatically.</div>
+      </div>
     </div>`).join('');
 }
+
+function toggleRenameStore(id) {
+  const el = document.getElementById('rename-' + id);
+  if (!el) return;
+  const isOpen = el.style.display !== 'none';
+  el.style.display = isOpen ? 'none' : 'block';
+  if (!isOpen) {
+    setTimeout(() => document.getElementById('rename-input-' + id)?.focus(), 50);
+  }
+}
+window.toggleRenameStore = toggleRenameStore;
+
+function saveRenameStore(id) {
+  const input = document.getElementById('rename-input-' + id);
+  if (!input) return;
+  const newName = input.value.trim();
+  if (!newName) return toast('Enter a store name');
+  const store = db.stores.find(s => s.id === id);
+  if (!store) return;
+  if (newName === store.name) { toggleRenameStore(id); return; }
+  if (db.stores.find(s => s.id !== id && s.name.toLowerCase() === newName.toLowerCase()))
+    return toast('A store with that name already exists');
+
+  const oldName = store.name;
+  updateDB(db => {
+    // Rename the store
+    const s = db.stores.find(s => s.id === id);
+    if (s) s.name = newName;
+    // Update e.store display field on entries that reference this store
+    // (storeId is the canonical ref, but e.store is used for display fallback)
+    db.entries.forEach(e => {
+      if (e.storeId === id || (!e.storeId && e.store === oldName)) {
+        e.store   = newName;
+        e.storeId = id;   // backfill storeId if missing
+      }
+    });
+  });
+  toast(`Renamed to "${newName}"`);
+}
+window.saveRenameStore = saveRenameStore;
 
 function refreshStoreSelects() {
   // Item 4: restore persisted last store across page reloads
@@ -2256,6 +2312,10 @@ function entryCardHtml(e, cache) {
     `<option value="${c}" ${(e.cat||'Other')===c?'selected':''}>${c}</option>`
   ).join('');
 
+  // Safely encode id for onclick attrs — UUIDs contain hyphens which break
+  // unquoted JS like removeEntry(abc-123-def) (parsed as subtraction)
+  const eid = JSON.stringify(String(e.id));
+
   return `
   <div class="entry-card ${isBest?'is-best':''} ${isStale?'is-stale':''}"
        data-entry-id="${e.id}"
@@ -2276,7 +2336,6 @@ function entryCardHtml(e, cache) {
         ${isBest  ? '<span class="badge badge-best">best</span>'     : ''}
         ${isWorst ? '<span class="badge badge-high">not best</span>' : ''}
       </div>
-      <!-- Improvement 2: inline edit with category dropdown -->
       <div class="edit-overlay" id="edit-${e.id}">
         <div class="edit-row">
           <input type="text"   id="en-${e.id}" value="${safeName}" style="flex:2">
@@ -2284,8 +2343,8 @@ function entryCardHtml(e, cache) {
           <select id="ec-${e.id}" style="font-size:13px;padding:7px 8px;flex:1;min-width:100px">${catOpts}</select>
         </div>
         <div style="display:flex;gap:6px;margin-top:6px">
-          <button class="btn btn-primary btn-sm" onclick="saveEdit(${e.id})" style="width:auto">Save</button>
-          <button class="btn btn-ghost  btn-sm" onclick="cancelEdit(${e.id})" style="width:auto">✕</button>
+          <button class="btn btn-primary btn-sm" onclick="saveEdit(${eid})" style="width:auto">Save</button>
+          <button class="btn btn-ghost  btn-sm" onclick="cancelEdit(${eid})" style="width:auto">✕</button>
         </div>
       </div>
       ${hist ? `
@@ -2302,17 +2361,17 @@ function entryCardHtml(e, cache) {
         ${inList?'style="color:var(--green-600)"':''}>
         <svg viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
       </button>
-      <button class="icon-btn" onclick="startEdit(${e.id})" title="Edit">
+      <button class="icon-btn" onclick="startEdit(${eid})" title="Edit">
         <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
       </button>
       ${hist ? `
-      <button class="icon-btn" onclick="toggleHistory(${e.id})" title="History">
+      <button class="icon-btn" onclick="toggleHistory(${eid})" title="History">
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
       </button>
-      <button class="icon-btn" onclick="openChartModal(${e.id})" title="Price chart">
+      <button class="icon-btn" onclick="openChartModal(${eid})" title="Price chart">
         <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
       </button>` : ''}
-      <button class="icon-btn danger" onclick="removeEntry(${e.id})" title="Delete">
+      <button class="icon-btn danger" onclick="removeEntry(${eid})" title="Delete">
         <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6M10 11v6M14 11v6"/></svg>
       </button>
     </div>
