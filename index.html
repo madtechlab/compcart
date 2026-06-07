@@ -173,18 +173,24 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--green-60
 .entry-name{font-size:14px;font-weight:500;color:var(--gray-900);margin-bottom:3px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .entry-meta{font-size:12px;color:var(--gray-500);display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .entry-price{font-family:monospace;font-size:16px;font-weight:600;color:var(--gray-900);white-space:nowrap}
-.entry-actions{display:flex;gap:4px;align-items:center;flex-shrink:0}
-.icon-btn{background:none;border:none;cursor:pointer;color:var(--gray-300);padding:6px;border-radius:6px;display:flex;align-items:center;min-width:32px;min-height:32px;justify-content:center}
+/* Larger touch targets for mobile — Apple HIG recommends 44×44px minimum */
+.entry-actions{display:flex;gap:2px;align-items:center;flex-shrink:0}
+.icon-btn{background:none;border:none;cursor:pointer;color:var(--gray-300);padding:8px;border-radius:8px;display:flex;align-items:center;min-width:40px;min-height:44px;justify-content:center;-webkit-tap-highlight-color:transparent}
 .icon-btn:hover{color:var(--green-700);background:var(--green-50)}
 .icon-btn.danger:hover{color:var(--red-600);background:var(--red-50)}
 .icon-btn.success{color:var(--green-600)}
-.icon-btn svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.icon-btn svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 
-/* INLINE EDIT */
-.edit-overlay{background:var(--green-50);border:1.5px solid var(--green-400);border-radius:var(--radius-md);padding:10px 12px;margin-bottom:8px;display:none}
+/* INLINE EDIT — stacks vertically on mobile for easier tapping */
+.edit-overlay{background:var(--green-50);border:1.5px solid var(--green-400);border-radius:var(--radius-md);padding:12px;margin-bottom:8px;display:none}
 .edit-overlay.open{display:block}
-.edit-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.edit-row input{flex:1;min-width:80px;padding:7px 10px;font-size:13px}
+.edit-row{display:grid;grid-template-columns:1fr;gap:8px}
+.edit-row input,.edit-row select{width:100%;padding:10px 12px;font-size:16px;border:1.5px solid var(--gray-300);border-radius:var(--radius-sm);font-family:var(--font-body)}
+.edit-date-row{display:flex;align-items:center;gap:8px;margin-top:4px}
+.edit-date-row label{font-size:13px;color:var(--gray-500);white-space:nowrap;flex-shrink:0}
+.edit-date-row input{flex:1;padding:10px 12px;font-size:16px;border:1.5px solid var(--gray-300);border-radius:var(--radius-sm);font-family:monospace}
+.edit-actions{display:flex;gap:8px;margin-top:8px}
+.edit-actions button{flex:1;padding:12px;font-size:15px}
 
 /* HISTORY PANEL */
 .history-panel{background:var(--gray-50);border-radius:var(--radius-md);padding:10px;margin-top:6px;display:none}
@@ -2338,20 +2344,19 @@ function entryCardHtml(e, cache) {
       </div>
       <div class="edit-overlay" id="edit-${e.id}">
         <div class="edit-row">
-          <input type="text"   id="en-${e.id}" value="${safeName}" style="flex:2">
-          <input type="number" id="ep-${e.id}" value="${e.price.toFixed(2)}" step="0.01" style="width:90px">
-          <select id="ec-${e.id}" style="font-size:13px;padding:7px 8px;flex:1;min-width:100px">${catOpts}</select>
+          <input type="text"   id="en-${e.id}" value="${safeName}" placeholder="Item name">
+          <input type="number" id="ep-${e.id}" value="${e.price.toFixed(2)}" step="0.01" placeholder="Price">
+          <select id="ec-${e.id}">${catOpts}</select>
         </div>
-        <div style="display:flex;gap:8px;align-items:center;margin-top:6px">
-          <label style="font-size:12px;color:var(--gray-500);white-space:nowrap">Date (YYYY-MM-DD):</label>
+        <div class="edit-date-row">
+          <label>Date (YYYY-MM-DD):</label>
           <input type="text" id="ed-${e.id}" value="${e.date||today()}"
             placeholder="${today()}"
-            pattern="\\d{4}-\\d{2}-\\d{2}"
-            style="flex:1;font-size:13px;padding:7px 10px;font-family:var(--font-mono)">
+            pattern="\\d{4}-\\d{2}-\\d{2}">
         </div>
-        <div style="display:flex;gap:6px;margin-top:6px">
-          <button class="btn btn-primary btn-sm" onclick="saveEdit(${eid})" style="width:auto">Save</button>
-          <button class="btn btn-ghost  btn-sm" onclick="cancelEdit(${eid})" style="width:auto">✕</button>
+        <div class="edit-actions">
+          <button class="btn btn-primary" onclick="saveEdit(${eid})">Save</button>
+          <button class="btn btn-ghost"   onclick="cancelEdit(${eid})">✕ Cancel</button>
         </div>
       </div>
       ${hist ? `
