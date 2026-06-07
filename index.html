@@ -2088,14 +2088,10 @@ function buildCache() {
 }
 
 function staleDays(dateStr) {
-  if (!dateStr) return 0;
-  // Compare as date strings to avoid UTC-vs-local timezone offset bug.
-  // new Date('YYYY-MM-DD') parses as UTC midnight which is yesterday evening
-  // in US timezones, making entries appear fresher than they are.
-  const entryDate = dateStr.slice(0, 10);  // 'YYYY-MM-DD'
-  const todayStr  = today();               // 'YYYY-MM-DD' in local time
+  if (!dateStr) return 999; // no date stored — treat as very stale, not as today
+  const entryDate = dateStr.slice(0, 10);
+  const todayStr  = today();
   if (entryDate === todayStr) return 0;
-  // For older entries, compute approximate days via timestamps
   return (Date.now() - new Date(dateStr + 'T12:00:00')) / 86400000;
 }
 
@@ -2349,7 +2345,7 @@ function entryCardHtml(e, cache) {
         </div>
         <div style="display:flex;gap:8px;align-items:center;margin-top:6px">
           <label style="font-size:12px;color:var(--gray-500);white-space:nowrap">Date:</label>
-          <input type="date" id="ed-${e.id}" value="${e.date||''}" style="flex:1;font-size:13px;padding:7px 10px">
+          <input type="date" id="ed-${e.id}" value="${e.date||today()}" style="flex:1;font-size:13px;padding:7px 10px">
         </div>
         <div style="display:flex;gap:6px;margin-top:6px">
           <button class="btn btn-primary btn-sm" onclick="saveEdit(${eid})" style="width:auto">Save</button>
