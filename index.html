@@ -1983,40 +1983,37 @@ function addEntry() {
 
 function removeEntry(id) {
   if (!confirm('Remove this price entry?')) return;
-  updateDB(db => { db.entries = db.entries.filter(e => e.id !== id); });
+  const sid = String(id);
+  updateDB(db => { db.entries = db.entries.filter(e => String(e.id) !== sid); });
 }
 
 function startEdit(id) {
-  // close any other open edits
+  const sid = String(id);
   document.querySelectorAll('.edit-overlay.open').forEach(el => el.classList.remove('open'));
-  const overlay = document.getElementById('edit-' + id);
+  const overlay = document.getElementById('edit-' + sid);
   if (overlay) overlay.classList.add('open');
 }
 
 function cancelEdit(id) {
-  const overlay = document.getElementById('edit-' + id);
+  const overlay = document.getElementById('edit-' + String(id));
   if (overlay) overlay.classList.remove('open');
 }
 
 function saveEdit(id) {
-  const entry    = db.entries.find(e => e.id === id);
+  const sid   = String(id);
+  const entry = db.entries.find(e => String(e.id) === sid);
   if (!entry) return;
-  const newPrice = parseFloat(document.getElementById('ep-' + id).value);
-  const newName  = document.getElementById('en-' + id).value.trim();
-  const newCat   = document.getElementById('ec-' + id)?.value || entry.cat || 'Other';
-  const newDate  = document.getElementById('ed-' + id)?.value?.trim() || today();
-  // Validate date format YYYY-MM-DD
+  const newPrice = parseFloat(document.getElementById('ep-' + sid).value);
+  const newName  = document.getElementById('en-' + sid).value.trim();
+  const newCat   = document.getElementById('ec-' + sid)?.value || entry.cat || 'Other';
+  const newDate  = document.getElementById('ed-' + sid)?.value?.trim() || today();
   if (newDate && !/^\d{4}-\d{2}-\d{2}$/.test(newDate)) {
     return toast('Date must be in YYYY-MM-DD format (e.g. 2026-06-03)');
   }
-  const cat      = newCat;
-
+  const cat = newCat;
   if (isNaN(newPrice) || newPrice < 0) return toast('Invalid price');
   if (!newName) return toast('Name cannot be empty');
-
-  const pctChange = entry.price > 0
-    ? Math.abs((newPrice - entry.price) / entry.price)
-    : 0;
+  const pctChange = entry.price > 0 ? Math.abs((newPrice - entry.price) / entry.price) : 0;
   if (pctChange > 0.5) {
     const direction = newPrice > entry.price ? 'increase' : 'decrease';
     const ok = confirm(
@@ -2027,15 +2024,12 @@ function saveEdit(id) {
     );
     if (!ok) return;
   }
-
   _lastCat = cat;
   localStorage.setItem('last_cat', cat);
-
   updateDB(db => {
-    const e = db.entries.find(x => x.id === id);
+    const e = db.entries.find(x => String(x.id) === sid);
     if (!e) return;
     if (!e.history) e.history = [];
-    // Only push history if price actually changed
     if (!e.history.length || e.history[0].price !== e.price) {
       e.history.unshift({ price: e.price, date: e.date });
     }
@@ -2044,17 +2038,17 @@ function saveEdit(id) {
     e.price     = newPrice;
     e.name      = normalizeItemName(newName);
     e.cat       = cat;
-    e.date      = newDate;   // use date from edit field, not always today()
+    e.date      = newDate;
     e.sizeOz    = size ? size.value : e.sizeOz;
     e.sizeUnit  = size ? size.unit  : e.sizeUnit;
     e.unitPrice = size ? newPrice / size.value : null;
   });
   toast('Updated!');
-  setTimeout(() => flashCard(id), 80);
+  setTimeout(() => flashCard(sid), 80);
 }
 
 function toggleHistory(id) {
-  const el = document.getElementById('hist-' + id);
+  const el = document.getElementById('hist-' + String(id));
   if (el) el.classList.toggle('open');
 }
 
