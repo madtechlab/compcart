@@ -2313,8 +2313,9 @@ function entryCardHtml(e, cache) {
   ).join('');
 
   // Safely encode id for onclick attrs — UUIDs contain hyphens which break
-  // unquoted JS like removeEntry(abc-123-def) (parsed as subtraction)
-  const eid = JSON.stringify(String(e.id));
+  // unquoted JS like removeEntry(abc-123-def) (parsed as subtraction).
+  // Use single-quoted string so it doesn't conflict with the attribute's double quotes.
+  const eid = `'${String(e.id)}'`;
 
   return `
   <div class="entry-card ${isBest?'is-best':''} ${isStale?'is-stale':''}"
