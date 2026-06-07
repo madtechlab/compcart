@@ -369,6 +369,47 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--green-60
 .unlock-attempts{
   font-size:12px;color:var(--gray-400);margin-top:8px;
 }
+/* ── HELP TAB ─────────────────────────────────────────── */
+.help-hero{background:var(--green-800);border-radius:var(--radius-lg);padding:24px 20px;margin-bottom:16px;text-align:center;color:var(--white)}
+.help-hero-icon{font-size:40px;margin-bottom:10px}
+.help-hero-title{font-family:var(--font-heading);font-size:22px;font-weight:600;margin-bottom:6px}
+.help-hero-sub{font-size:14px;color:var(--green-200);line-height:1.5}
+
+.help-section{background:var(--white);border-radius:var(--radius-lg);border:1px solid var(--gray-100);margin-bottom:14px;overflow:hidden}
+.help-section-header{display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--green-50);border-bottom:1px solid var(--green-100);cursor:pointer;user-select:none}
+.help-section-icon{font-size:22px;flex-shrink:0}
+.help-section-title{font-family:var(--font-heading);font-size:15px;font-weight:600;color:var(--green-800);flex:1}
+.help-section-chevron{font-size:12px;color:var(--green-600);transition:transform 0.2s;flex-shrink:0}
+.help-section-chevron.open{transform:rotate(180deg)}
+.help-section-body{display:none;padding:16px}
+.help-section-body.open{display:block}
+
+.help-step{display:flex;gap:12px;margin-bottom:14px;align-items:flex-start}
+.help-step:last-child{margin-bottom:0}
+.help-step-num{width:26px;height:26px;border-radius:50%;background:var(--green-700);color:var(--white);font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+.help-step-content{flex:1}
+.help-step-title{font-size:14px;font-weight:500;color:var(--gray-900);margin-bottom:3px}
+.help-step-desc{font-size:13px;color:var(--gray-500);line-height:1.5}
+
+.help-tip{background:var(--amber-100);border-left:3px solid var(--amber-600);border-radius:0 var(--radius-md) var(--radius-md) 0;padding:10px 13px;margin-top:12px;font-size:13px;color:var(--amber-600);line-height:1.5}
+.help-tip b{font-weight:600}
+
+.help-badge-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.help-badge{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:20px;font-size:12px;font-weight:500}
+.help-badge.green{background:#dcfce7;color:#166534}
+.help-badge.amber{background:#fef3c7;color:#92400e}
+.help-badge.blue{background:#dbeafe;color:#1e40af}
+.help-badge.red{background:var(--red-50);color:var(--red-600)}
+
+.help-example{background:var(--gray-50);border-radius:var(--radius-md);padding:14px;margin-top:12px;border:1px solid var(--gray-200)}
+.help-example-title{font-size:12px;font-weight:600;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:10px}
+.help-example-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--gray-100);font-size:13px}
+.help-example-row:last-child{border-bottom:none}
+
+.help-features{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.help-feature{background:var(--gray-50);border-radius:var(--radius-md);padding:10px;text-align:center;border:1px solid var(--gray-100)}
+.help-feature-icon{font-size:20px;margin-bottom:4px}
+.help-feature-label{font-size:12px;color:var(--gray-600);font-weight:500}
 </style>
 </head>
 <body>
@@ -421,6 +462,9 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--green-60
     </button>
     <button class="tab" onclick="showTab('settings')" data-tab="settings">
       <span class="tab-icon">⚙️</span><span>Settings</span>
+    </button>
+    <button class="tab" onclick="showTab('help')" data-tab="help">
+      <span class="tab-icon">❓</span><span>Help</span>
     </button>
   </div>
 </div>
@@ -733,7 +777,349 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--green-60
   </div>
 </div>
 
-<!-- PRICE HISTORY CHART MODAL -->
+<!-- ═══ HELP TAB ═══ -->
+<div id="tab-help" class="section">
+  <div class="content">
+
+    <!-- Hero -->
+    <div class="help-hero">
+      <div class="help-hero-icon">🛒</div>
+      <div class="help-hero-title">MaD-CompCart Guide</div>
+      <div class="help-hero-sub">Track grocery prices across stores and always know where to get the best deal</div>
+    </div>
+
+    <!-- What you can do -->
+    <div class="help-features" style="margin-bottom:16px">
+      <div class="help-feature"><div class="help-feature-icon">🏷️</div><div class="help-feature-label">Track prices</div></div>
+      <div class="help-feature"><div class="help-feature-icon">📷</div><div class="help-feature-label">Scan barcodes</div></div>
+      <div class="help-feature"><div class="help-feature-icon">🛒</div><div class="help-feature-label">Smart shopping list</div></div>
+      <div class="help-feature"><div class="help-feature-icon">⭐</div><div class="help-feature-label">Find best deals</div></div>
+    </div>
+
+    <!-- Section 1: First Time Setup -->
+    <div class="help-section">
+      <div class="help-section-header" onclick="toggleHelp('setup')">
+        <span class="help-section-icon">🟢</span>
+        <span class="help-section-title">1. First Time Setup</span>
+        <span class="help-section-chevron" id="chev-setup">▼</span>
+      </div>
+      <div class="help-section-body open" id="body-setup">
+        <div class="help-step">
+          <div class="help-step-num">1</div>
+          <div class="help-step-content">
+            <div class="help-step-title">Go to the Settings tab ⚙️</div>
+            <div class="help-step-desc">Tap Settings at the top of the screen</div>
+          </div>
+        </div>
+        <div class="help-step">
+          <div class="help-step-num">2</div>
+          <div class="help-step-content">
+            <div class="help-step-title">Add your stores</div>
+            <div class="help-step-desc">Under Stores, enter the store name (e.g. Walmart, Aldi) and an optional location, then tap <b>+ Add store</b></div>
+          </div>
+        </div>
+        <div class="help-step">
+          <div class="help-step-num">3</div>
+          <div class="help-step-content">
+            <div class="help-step-title">Repeat for all your stores</div>
+            <div class="help-step-desc">Do this once for every store you shop at — you only need to do it one time</div>
+          </div>
+        </div>
+        <div class="help-tip">✅ <b>Done!</b> Now you're ready to start tracking prices.</div>
+      </div>
+    </div>
+
+    <!-- Section 2: Adding Prices -->
+    <div class="help-section">
+      <div class="help-section-header" onclick="toggleHelp('prices')">
+        <span class="help-section-icon">🏷️</span>
+        <span class="help-section-title">2. Adding Prices</span>
+        <span class="help-section-chevron" id="chev-prices">▼</span>
+      </div>
+      <div class="help-section-body" id="body-prices">
+
+        <p style="font-size:13px;color:var(--gray-500);margin-bottom:14px">Three ways to add prices — pick whichever fits the moment:</p>
+
+        <div style="font-size:13px;font-weight:600;color:var(--green-800);margin-bottom:8px">Option A — Type it in manually</div>
+        <div class="help-step">
+          <div class="help-step-num">1</div>
+          <div class="help-step-content"><div class="help-step-desc">Go to the <b>Prices</b> tab</div></div>
+        </div>
+        <div class="help-step">
+          <div class="help-step-num">2</div>
+          <div class="help-step-content"><div class="help-step-desc">Fill in item name, category, store, and price</div></div>
+        </div>
+        <div class="help-step">
+          <div class="help-step-num">3</div>
+          <div class="help-step-content"><div class="help-step-desc">Tap <b>+ Add price entry</b></div></div>
+        </div>
+
+        <div style="font-size:13px;font-weight:600;color:var(--green-800);margin:14px 0 8px">Option B — Scan a barcode 📷</div>
+        <div class="help-step">
+          <div class="help-step-num">1</div>
+          <div class="help-step-content"><div class="help-step-desc">Go to <b>Import</b> → tap <b>Scan Barcode</b></div></div>
+        </div>
+        <div class="help-step">
+          <div class="help-step-num">2</div>
+          <div class="help-step-content"><div class="help-step-desc">Tap <b>Start Camera Scanner</b> and point at the barcode</div></div>
+        </div>
+        <div class="help-step">
+          <div class="help-step-num">3</div>
+          <div class="help-step-content"><div class="help-step-desc">Enter the price from the shelf, tap <b>+ Add to prices</b></div></div>
+        </div>
+        <div class="help-tip">💡 <b>Best for in-store use</b> — fastest workflow when you're shopping</div>
+
+        <div style="font-size:13px;font-weight:600;color:var(--green-800);margin:14px 0 8px">Option C — Photo or receipt 🧾</div>
+        <div class="help-step">
+          <div class="help-step-num">1</div>
+          <div class="help-step-content"><div class="help-step-desc">Go to <b>Import</b> → tap <b>Photo / Receipt</b></div></div>
+        </div>
+        <div class="help-step">
+          <div class="help-step-num">2</div>
+          <div class="help-step-content"><div class="help-step-desc">Take or select a photo of a price tag or receipt</div></div>
+        </div>
+        <div class="help-step">
+          <div class="help-step-num">3</div>
+          <div class="help-step-content"><div class="help-step-desc">Review the detected items and tap <b>Add selected items</b></div></div>
+        </div>
+        <div class="help-tip">🤖 <b>AI-powered</b> — the app reads prices automatically from photos</div>
+      </div>
+    </div>
+
+    <!-- Section 3: Browsing Prices -->
+    <div class="help-section">
+      <div class="help-section-header" onclick="toggleHelp('browse')">
+        <span class="help-section-icon">🔍</span>
+        <span class="help-section-title">3. Browsing Your Prices</span>
+        <span class="help-section-chevron" id="chev-browse">▼</span>
+      </div>
+      <div class="help-section-body" id="body-browse">
+        <p style="font-size:13px;color:var(--gray-500);margin-bottom:12px">In the Prices tab you can search, sort, and filter your entries:</p>
+        <div class="help-badge-row">
+          <span class="help-badge blue">🔍 Search by name</span>
+          <span class="help-badge blue">A–Z sort</span>
+          <span class="help-badge blue">Price sort</span>
+          <span class="help-badge blue">Filter by category</span>
+          <span class="help-badge blue">⏱ Filter by age</span>
+        </div>
+        <div style="margin-top:14px;font-size:13px;font-weight:600;color:var(--gray-700);margin-bottom:8px">What the labels mean:</div>
+        <div class="help-badge-row">
+          <span class="help-badge green">🏆 Best — lowest price for this item</span>
+          <span class="help-badge amber">⚠️ Stale — price over 60 days old</span>
+          <span class="help-badge red">↑ Trend — price going up</span>
+          <span class="help-badge green">↓ Trend — price going down</span>
+        </div>
+        <div class="help-tip">💡 <b>Unit pricing:</b> Tap the <b>$/unit</b> button to compare by ounce or pound instead of total price — great for different size packages</div>
+      </div>
+    </div>
+
+    <!-- Section 4: Shopping List -->
+    <div class="help-section">
+      <div class="help-section-header" onclick="toggleHelp('shop')">
+        <span class="help-section-icon">🛒</span>
+        <span class="help-section-title">4. Building Your Shopping List</span>
+        <span class="help-section-chevron" id="chev-shop">▼</span>
+      </div>
+      <div class="help-section-body" id="body-shop">
+        <div class="help-step">
+          <div class="help-step-num">1</div>
+          <div class="help-step-content">
+            <div class="help-step-title">Go to the Shop tab 🛒</div>
+            <div class="help-step-desc">Type an item name and tap <b>Add</b> — or tap the cart icon on any price entry</div>
+          </div>
+        </div>
+        <div class="help-step">
+          <div class="help-step-num">2</div>
+          <div class="help-step-content">
+            <div class="help-step-title">The app does the work ✨</div>
+            <div class="help-step-desc">Automatically finds the cheapest store for each item and groups your list by store</div>
+          </div>
+        </div>
+        <div class="help-step">
+          <div class="help-step-num">3</div>
+          <div class="help-step-content">
+            <div class="help-step-title">Shop and check off items</div>
+            <div class="help-step-desc">Tap the checkbox next to each item as you add it to your cart</div>
+          </div>
+        </div>
+        <div class="help-example">
+          <div class="help-example-title">What you'll see</div>
+          <div class="help-example-row"><span>🏪 Store grouped by best price</span><span style="color:var(--green-700);font-weight:600">$12.45</span></div>
+          <div class="help-example-row"><span>💰 Savings banner if splitting helps</span><span style="color:var(--green-700)">Save $3.20</span></div>
+          <div class="help-example-row"><span>📋 Items with no price data</span><span style="color:var(--gray-400)">—</span></div>
+        </div>
+        <div class="help-tip">💡 Use the <b>Min. saving worth a separate trip</b> slider to control when the app recommends splitting your shopping between stores</div>
+      </div>
+    </div>
+
+    <!-- Section 5: Best Deals -->
+    <div class="help-section">
+      <div class="help-section-header" onclick="toggleHelp('deals')">
+        <span class="help-section-icon">⭐</span>
+        <span class="help-section-title">5. Best Deals Tab</span>
+        <span class="help-section-chevron" id="chev-deals">▼</span>
+      </div>
+      <div class="help-section-body" id="body-deals">
+        <p style="font-size:13px;color:var(--gray-500);margin-bottom:12px">Go to the <b>Deals</b> tab to see your complete savings picture:</p>
+        <div class="help-step">
+          <div class="help-step-num">✓</div>
+          <div class="help-step-content"><div class="help-step-desc">Cheapest store for every tracked item</div></div>
+        </div>
+        <div class="help-step">
+          <div class="help-step-num">✓</div>
+          <div class="help-step-content"><div class="help-step-desc">How much you save per item vs the highest price</div></div>
+        </div>
+        <div class="help-step">
+          <div class="help-step-num">✓</div>
+          <div class="help-step-content"><div class="help-step-desc">Total possible savings across all items</div></div>
+        </div>
+        <div class="help-step">
+          <div class="help-step-num">✓</div>
+          <div class="help-step-content"><div class="help-step-desc"><b>Best Cart Cost</b> — the absolute cheapest way to buy everything by cherry-picking the best price at each store</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 6: Price History -->
+    <div class="help-section">
+      <div class="help-section-header" onclick="toggleHelp('history')">
+        <span class="help-section-icon">📊</span>
+        <span class="help-section-title">6. Price History</span>
+        <span class="help-section-chevron" id="chev-history">▼</span>
+      </div>
+      <div class="help-section-body" id="body-history">
+        <p style="font-size:13px;color:var(--gray-500);margin-bottom:12px">Every time you update a price the old one is saved automatically.</p>
+        <div class="help-step">
+          <div class="help-step-num">1</div>
+          <div class="help-step-content">
+            <div class="help-step-title">Tap the chart icon 〰️ on any price entry</div>
+            <div class="help-step-desc">Only appears after you've updated a price at least once</div>
+          </div>
+        </div>
+        <div class="help-step">
+          <div class="help-step-num">2</div>
+          <div class="help-step-content">
+            <div class="help-step-title">You'll see a price chart with:</div>
+            <div class="help-step-desc">High / Low / Average price, trend over time, and a <b>30d / 90d / 1yr / All</b> range selector</div>
+          </div>
+        </div>
+        <div class="help-tip">📉 <b>Price drop alert:</b> If the current price is significantly below recent average, the chart shows a green banner — great for spotting when to stock up!</div>
+      </div>
+    </div>
+
+    <!-- Section 7: Settings -->
+    <div class="help-section">
+      <div class="help-section-header" onclick="toggleHelp('settings')">
+        <span class="help-section-icon">⚙️</span>
+        <span class="help-section-title">7. Helpful Settings</span>
+        <span class="help-section-chevron" id="chev-settings">▼</span>
+      </div>
+      <div class="help-section-body" id="body-settings">
+        <div class="help-step">
+          <div class="help-step-num">📦</div>
+          <div class="help-step-content">
+            <div class="help-step-title">Export data</div>
+            <div class="help-step-desc">Save everything as a backup — JSON (for restoring later) or CSV (for Excel / Google Sheets)</div>
+          </div>
+        </div>
+        <div class="help-step">
+          <div class="help-step-num">🔄</div>
+          <div class="help-step-content">
+            <div class="help-step-title">Import backup</div>
+            <div class="help-step-desc">Restore your data from a previously exported JSON file</div>
+          </div>
+        </div>
+        <div class="help-step">
+          <div class="help-step-num">🧹</div>
+          <div class="help-step-content">
+            <div class="help-step-title">Find &amp; merge duplicates</div>
+            <div class="help-step-desc">If you've entered the same item with slightly different names, this tool finds and merges them into one</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 8: Offline Mode -->
+    <div class="help-section">
+      <div class="help-section-header" onclick="toggleHelp('offline')">
+        <span class="help-section-icon">📵</span>
+        <span class="help-section-title">8. Offline Mode</span>
+        <span class="help-section-chevron" id="chev-offline">▼</span>
+      </div>
+      <div class="help-section-body" id="body-offline">
+        <p style="font-size:13px;color:var(--gray-500);margin-bottom:12px">No internet? No problem.</p>
+        <div class="help-step">
+          <div class="help-step-num">✓</div>
+          <div class="help-step-content"><div class="help-step-desc">The app still works fully without a connection</div></div>
+        </div>
+        <div class="help-step">
+          <div class="help-step-num">✓</div>
+          <div class="help-step-content"><div class="help-step-desc">Changes are saved locally to your device</div></div>
+        </div>
+        <div class="help-step">
+          <div class="help-step-num">✓</div>
+          <div class="help-step-content"><div class="help-step-desc">Syncs automatically the moment you reconnect</div></div>
+        </div>
+        <div class="help-tip">📵 A purple banner appears at the top when you're offline so you always know your connection status</div>
+      </div>
+    </div>
+
+    <!-- Tips -->
+    <div class="help-section">
+      <div class="help-section-header" onclick="toggleHelp('tips')">
+        <span class="help-section-icon">💡</span>
+        <span class="help-section-title">Tips for Best Results</span>
+        <span class="help-section-chevron" id="chev-tips">▼</span>
+      </div>
+      <div class="help-section-body" id="body-tips">
+        <div class="help-step">
+          <div class="help-step-num">✔</div>
+          <div class="help-step-content">
+            <div class="help-step-title">Use consistent names</div>
+            <div class="help-step-desc">"Milk 1 gallon" instead of random variations — keeps comparisons accurate</div>
+          </div>
+        </div>
+        <div class="help-step">
+          <div class="help-step-num">✔</div>
+          <div class="help-step-content">
+            <div class="help-step-title">Include size when possible</div>
+            <div class="help-step-desc">"Peanut Butter 28 oz" — enables unit price comparison between different sizes</div>
+          </div>
+        </div>
+        <div class="help-step">
+          <div class="help-step-num">✔</div>
+          <div class="help-step-content">
+            <div class="help-step-title">Update prices regularly</div>
+            <div class="help-step-desc">Prices older than 60 days get a ⚠️ stale warning — keeps recommendations accurate</div>
+          </div>
+        </div>
+        <div class="help-step">
+          <div class="help-step-num">✔</div>
+          <div class="help-step-content">
+            <div class="help-step-title">Use barcode scanning in-store</div>
+            <div class="help-step-desc">Fastest workflow — scan, enter price, done in seconds</div>
+          </div>
+        </div>
+
+        <div class="help-example">
+          <div class="help-example-title">🧠 Quick Example</div>
+          <div class="help-example-row"><span>Milk at Walmart</span><span style="color:var(--red-600)">$3.50</span></div>
+          <div class="help-example-row"><span>Milk at Aldi</span><span style="color:var(--green-700);font-weight:600">$2.99 ✓ Best</span></div>
+          <div style="font-size:12px;color:var(--gray-500);margin-top:10px;line-height:1.6">
+            → Prices tab shows Aldi as best<br>
+            → Shopping list puts milk under Aldi<br>
+            → Deals tab shows your $0.51 savings
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="text-align:center;padding:20px 0;font-size:13px;color:var(--gray-400)">
+      MaD-CompCart • Shop smarter 🛒
+    </div>
+    <div class="bottom-spacer"></div>
+  </div>
+</div>
 <div class="modal-backdrop hidden" id="chart-modal" onclick="closeChartModal(event)">
   <div class="modal-sheet" role="dialog" aria-modal="true" aria-labelledby="chart-modal-title">
     <div class="modal-header">
@@ -2372,6 +2758,17 @@ function showTab(tab) {
   if (tab === 'list')     renderShoppingList();
   refreshStoreSelects();
 }
+
+// Toggle collapsible help sections
+function toggleHelp(id) {
+  const body = document.getElementById('body-' + id);
+  const chev = document.getElementById('chev-' + id);
+  if (!body) return;
+  const isOpen = body.classList.contains('open');
+  body.classList.toggle('open', !isOpen);
+  if (chev) chev.classList.toggle('open', !isOpen);
+}
+window.toggleHelp = toggleHelp;
 
 /* ── AI IMPORT (OpenAI) ───────────────────────────────── */
 async function handleImport(input) {
