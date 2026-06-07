@@ -2004,7 +2004,11 @@ function saveEdit(id) {
   const newPrice = parseFloat(document.getElementById('ep-' + id).value);
   const newName  = document.getElementById('en-' + id).value.trim();
   const newCat   = document.getElementById('ec-' + id)?.value || entry.cat || 'Other';
-  const newDate  = document.getElementById('ed-' + id)?.value || today();
+  const newDate  = document.getElementById('ed-' + id)?.value?.trim() || today();
+  // Validate date format YYYY-MM-DD
+  if (newDate && !/^\d{4}-\d{2}-\d{2}$/.test(newDate)) {
+    return toast('Date must be in YYYY-MM-DD format (e.g. 2026-06-03)');
+  }
   const cat      = newCat;
 
   if (isNaN(newPrice) || newPrice < 0) return toast('Invalid price');
@@ -2344,8 +2348,11 @@ function entryCardHtml(e, cache) {
           <select id="ec-${e.id}" style="font-size:13px;padding:7px 8px;flex:1;min-width:100px">${catOpts}</select>
         </div>
         <div style="display:flex;gap:8px;align-items:center;margin-top:6px">
-          <label style="font-size:12px;color:var(--gray-500);white-space:nowrap">Date:</label>
-          <input type="date" id="ed-${e.id}" value="${e.date||today()}" style="flex:1;font-size:13px;padding:7px 10px">
+          <label style="font-size:12px;color:var(--gray-500);white-space:nowrap">Date (YYYY-MM-DD):</label>
+          <input type="text" id="ed-${e.id}" value="${e.date||today()}"
+            placeholder="${today()}"
+            pattern="\\d{4}-\\d{2}-\\d{2}"
+            style="flex:1;font-size:13px;padding:7px 10px;font-family:var(--font-mono)">
         </div>
         <div style="display:flex;gap:6px;margin-top:6px">
           <button class="btn btn-primary btn-sm" onclick="saveEdit(${eid})" style="width:auto">Save</button>
