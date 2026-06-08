@@ -166,16 +166,17 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--green-60
 .sc-4{background:#ede9fe;color:#4c1d95}
 
 /* PRICE ENTRY CARD */
-.entry-card{background:var(--white);border:1px solid var(--gray-100);border-radius:var(--radius-md);padding:12px 14px;margin-bottom:8px;display:flex;flex-wrap:wrap;align-items:flex-start;gap:10px}
+.entry-card{background:var(--white);border:1px solid var(--gray-100);border-radius:var(--radius-md);padding:12px 14px;margin-bottom:8px;display:flex;flex-wrap:wrap;align-items:flex-start;gap:8px}
 .entry-card.is-best{border-left:3px solid #4ade80}
 .entry-card.is-stale{opacity:0.65}
 .entry-main{flex:1;min-width:0}
-.entry-name{font-size:14px;font-weight:500;color:var(--gray-900);margin-bottom:3px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
-.entry-meta{font-size:12px;color:var(--gray-500);display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.entry-name{font-size:14px;font-weight:500;color:var(--gray-900);margin-bottom:4px;line-height:1.4}
+.entry-name-trend{font-size:12px;display:inline-block;margin-left:4px}
+.entry-meta{font-size:12px;color:var(--gray-500);display:flex;gap:6px;flex-wrap:wrap;align-items:center;line-height:1.6}
 .entry-price{font-family:monospace;font-size:16px;font-weight:600;color:var(--gray-900);white-space:nowrap}
-/* Larger touch targets for mobile — Apple HIG recommends 44×44px minimum */
-.entry-actions{display:flex;gap:2px;align-items:center;flex-shrink:0}
-.icon-btn{background:none;border:none;cursor:pointer;color:var(--gray-300);padding:8px;border-radius:8px;display:flex;align-items:center;min-width:40px;min-height:44px;justify-content:center;-webkit-tap-highlight-color:transparent}
+/* Actions column — fixed width so name gets maximum space */
+.entry-actions{display:flex;gap:0;align-items:center;flex-shrink:0;flex-wrap:nowrap}
+.icon-btn{background:none;border:none;cursor:pointer;color:var(--gray-300);padding:6px;border-radius:8px;display:flex;align-items:center;min-width:38px;min-height:44px;justify-content:center;-webkit-tap-highlight-color:transparent}
 .icon-btn:hover{color:var(--green-700);background:var(--green-50)}
 .icon-btn.danger:hover{color:var(--red-600);background:var(--red-50)}
 .icon-btn.success{color:var(--green-600)}
@@ -2349,9 +2350,7 @@ function entryCardHtml(e, cache) {
        style="${isToday?'background:#f0fdf4;':''}">
     <div class="entry-main">
       <div class="entry-name">
-        ${isBest ? '🏆' : ''}
-        <span>${safeName}</span>
-        ${trend ? `<span class="${trend.cls}">${trend.arrow}${trend.label}${sparklineHtml(e)}</span>` : ''}
+        ${isBest ? '🏆 ' : ''}<span>${safeName}</span>${trend ? `<span class="entry-name-trend ${trend.cls}">${trend.arrow}${trend.label}${sparklineHtml(e)}</span>` : ''}
       </div>
       <div class="entry-meta">
         <span class="badge-store sc-${si>=0?si%5:0}">${safeStore}</span>
@@ -2610,8 +2609,10 @@ function addToList() {
 window.addToListByName = function(name) {
   const normalized = normalizeItemName(name);
   if (shoppingList.find(i => i.name === normalized)) {
-    toast('Already in list'); return;
+    toast('"' + normalized + '" is already on your list'); return;
   }
+  // Confirm before adding — prevents accidental adds when tapping near edit
+  if (!confirm(`Add "${normalized}" to your shopping list?`)) return;
   shoppingList.push({ name: normalized, checked: false, id: newId() });
   saveShoppingList();
   toast(`✓ "${normalized}" added to shopping list`);
