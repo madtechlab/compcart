@@ -1452,6 +1452,7 @@ function startDatabaseSync() {
     const data = snapshot.val();
     if (data) {
       if (_pendingSync) {
+        // We have local changes that haven't reached Firebase yet — push them now
         _pendingSync = false;
         dbRef.update({
           stores:          db.stores,
@@ -1466,12 +1467,35 @@ function startDatabaseSync() {
           shoppingList: data.shoppingList || []
         };
         incoming = runMigrations(incoming);
+
+        // MERGE strategy: for each entry, keep whichever version has the
+        // more recent date. This prevents a stale device from overwriting
+        // changes made on another device.
+        const localById = {};
+        db.entries.forEach(e => { localById[String(e.id)] = e; });
+
+        incoming.entries = incoming.entries.map(incomingEntry => {
+          const local = localById[String(incomingEntry.id)];
+          if (!local) return incomingEntry; // new entry from another device — keep it
+          // Compare dates — keep whichever was updated more recently
+          const incomingDate = incomingEntry.date || '0000-00-00';
+          const localDate    = local.date          || '0000-00-00';
+          return localDate > incomingDate ? local : incomingEntry;
+        });
+
+        // Also keep any local-only entries not yet in Firebase
+        const incomingIds = new Set(incoming.entries.map(e => String(e.id)));
+        db.entries.forEach(e => {
+          if (!incomingIds.has(String(e.id))) incoming.entries.push(e);
+        });
+
         db           = incoming;
         shoppingList = db.shoppingList;
         localSave();
         if ((data._schemaVersion || 0) < CURRENT_SCHEMA_VERSION) pushSync();
       }
     } else {
+      // No data in Firebase yet — push our local data up
       pushSync();
     }
     invalidateCache();
@@ -2348,23 +2372,6 @@ function entryCardHtml(e, cache) {
         ${isBest  ? '<span class="badge badge-best">best</span>'     : ''}
         ${isWorst ? '<span class="badge badge-high">not best</span>' : ''}
       </div>
-      <div class="edit-overlay" id="edit-${e.id}">
-        <div class="edit-row">
-          <input type="text"   id="en-${e.id}" value="${safeName}" placeholder="Item name">
-          <input type="number" id="ep-${e.id}" value="${e.price.toFixed(2)}" step="0.01" placeholder="Price">
-          <select id="ec-${e.id}">${catOpts}</select>
-        </div>
-        <div class="edit-date-row">
-          <label>Date (YYYY-MM-DD):</label>
-          <input type="text" id="ed-${e.id}" value="${e.date||today()}"
-            placeholder="${today()}"
-            pattern="\\d{4}-\\d{2}-\\d{2}">
-        </div>
-        <div class="edit-actions">
-          <button class="btn btn-primary" onclick="saveEdit(${eid})">Save</button>
-          <button class="btn btn-ghost"   onclick="cancelEdit(${eid})">✕ Cancel</button>
-        </div>
-      </div>
       ${hist ? `
       <div class="history-panel" id="hist-${e.id}">
         <div style="font-size:11px;font-weight:600;color:var(--gray-400);text-transform:uppercase;margin-bottom:4px">Price history</div>
@@ -2392,6 +2399,24 @@ function entryCardHtml(e, cache) {
       <button class="icon-btn danger" onclick="removeEntry(${eid})" title="Delete">
         <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6M10 11v6M14 11v6"/></svg>
       </button>
+    </div>
+    <!-- Edit overlay is a direct child of entry-card (flex container) so flex-basis:100% spans full width -->
+    <div class="edit-overlay" id="edit-${e.id}">
+      <div class="edit-row">
+        <input type="text"   id="en-${e.id}" value="${safeName}" placeholder="Item name">
+        <input type="number" id="ep-${e.id}" value="${e.price.toFixed(2)}" step="0.01" placeholder="Price">
+        <select id="ec-${e.id}">${catOpts}</select>
+      </div>
+      <div class="edit-date-row">
+        <label>Date (YYYY-MM-DD):</label>
+        <input type="text" id="ed-${e.id}" value="${e.date||today()}"
+          placeholder="${today()}"
+          pattern="\\d{4}-\\d{2}-\\d{2}">
+      </div>
+      <div class="edit-actions">
+        <button class="btn btn-primary" onclick="saveEdit(${eid})">Save</button>
+        <button class="btn btn-ghost"   onclick="cancelEdit(${eid})">✕ Cancel</button>
+      </div>
     </div>
   </div>`;
 }
