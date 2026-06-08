@@ -1392,6 +1392,19 @@ function localLoad() {
   } catch(e) { logError('localLoad', e); }
 }
 
+// Firebase rejects undefined values — replace all undefined with null before writing
+function sanitizeForFirebase(obj) {
+  if (Array.isArray(obj)) return obj.map(sanitizeForFirebase);
+  if (obj !== null && typeof obj === 'object') {
+    const clean = {};
+    for (const k of Object.keys(obj)) {
+      clean[k] = obj[k] === undefined ? null : sanitizeForFirebase(obj[k]);
+    }
+    return clean;
+  }
+  return obj === undefined ? null : obj;
+}
+
 function pushSync(immediate) {
   db.shoppingList = shoppingList;
   localSave();
@@ -1403,13 +1416,15 @@ function pushSync(immediate) {
   clearTimeout(_syncTimer);
   const delay = immediate ? 0 : 300;
   _syncTimer = setTimeout(() => {
-    console.log('[pushSync] writing to Firebase, entries:', db.entries.length);
-    dbRef.update({
+    // Sanitize before writing — Firebase throws on undefined values
+    const payload = sanitizeForFirebase({
       stores:         db.stores,
       entries:        db.entries,
       shoppingList:   db.shoppingList,
       _schemaVersion: CURRENT_SCHEMA_VERSION
-    }).then(() => {
+    });
+    console.log('[pushSync] writing to Firebase, entries:', db.entries.length);
+    dbRef.update(payload).then(() => {
       console.log('[pushSync] Firebase write SUCCESS');
       setSyncStatus(true);
     }).catch(err => {
@@ -2044,7 +2059,7 @@ function saveEdit(id) {
     if (!e) return;
     if (!e.history) e.history = [];
     if (!e.history.length || e.history[0].price !== e.price) {
-      e.history.unshift({ price: e.price, date: e.date });
+      e.history.unshift({ price: e.price, date: e.date || null });
     }
     if (e.history.length > 10) e.history = e.history.slice(0, 10);
     const size  = extractSize(newName);
