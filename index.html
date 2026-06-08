@@ -1468,26 +1468,32 @@ function startDatabaseSync() {
         };
         incoming = runMigrations(incoming);
 
-        // MERGE strategy: for each entry, keep whichever version has the
-        // more recent date. This prevents a stale device from overwriting
-        // changes made on another device.
-        const localById = {};
-        db.entries.forEach(e => { localById[String(e.id)] = e; });
+        // On a clean load with no pending local changes, Firebase is the
+        // source of truth — just take it. Only merge when we have genuinely
+        // pending local writes that haven't reached Firebase yet.
+        if (_pendingSync) {
+          // We have local changes — merge: keep whichever entry date is newer
+          const localById = {};
+          db.entries.forEach(e => { localById[String(e.id)] = e; });
 
-        incoming.entries = incoming.entries.map(incomingEntry => {
-          const local = localById[String(incomingEntry.id)];
-          if (!local) return incomingEntry; // new entry from another device — keep it
-          // Compare dates — keep whichever was updated more recently
-          const incomingDate = incomingEntry.date || '0000-00-00';
-          const localDate    = local.date          || '0000-00-00';
-          return localDate > incomingDate ? local : incomingEntry;
-        });
-
-        // Also keep any local-only entries not yet in Firebase
-        const incomingIds = new Set(incoming.entries.map(e => String(e.id)));
-        db.entries.forEach(e => {
-          if (!incomingIds.has(String(e.id))) incoming.entries.push(e);
-        });
+          incoming.entries = incoming.entries.map(incomingEntry => {
+            const local = localById[String(incomingEntry.id)];
+            if (!local) return incomingEntry;
+            // If local has no date but incoming does, always take incoming
+            if (!local.date && incomingEntry.date) return incomingEntry;
+            const incomingDate = incomingEntry.date || '0000-00-00';
+            const localDate    = local.date          || '0000-00-00';
+            return localDate > incomingDate ? local : incomingEntry;
+          });
+          // Keep local-only entries not in Firebase yet
+          const incomingIds = new Set(incoming.entries.map(e => String(e.id)));
+          db.entries.forEach(e => {
+            if (!incomingIds.has(String(e.id))) incoming.entries.push(e);
+          });
+          _pendingSync = false;
+          // Push merged result back so Firebase has the complete picture
+          setTimeout(() => pushSync(), 100);
+        }
 
         db           = incoming;
         shoppingList = db.shoppingList;
