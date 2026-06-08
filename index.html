@@ -1395,17 +1395,28 @@ function localLoad() {
 function pushSync(immediate) {
   db.shoppingList = shoppingList;
   localSave();
-  if (!firebase.auth().currentUser) return;
+  if (!firebase.auth().currentUser) {
+    console.warn('[pushSync] no auth user — skipping Firebase write');
+    return;
+  }
   if (!navigator.onLine) { showOfflineBanner(true); return; }
   clearTimeout(_syncTimer);
   const delay = immediate ? 0 : 300;
   _syncTimer = setTimeout(() => {
+    console.log('[pushSync] writing to Firebase, entries:', db.entries.length);
     dbRef.update({
       stores:         db.stores,
       entries:        db.entries,
       shoppingList:   db.shoppingList,
       _schemaVersion: CURRENT_SCHEMA_VERSION
-    }).catch(err => logError('pushSync', err));
+    }).then(() => {
+      console.log('[pushSync] Firebase write SUCCESS');
+      setSyncStatus(true);
+    }).catch(err => {
+      console.error('[pushSync] Firebase write FAILED:', err);
+      logError('pushSync', err);
+      toast('⚠️ Save failed: ' + (err.message || err));
+    });
   }, delay);
 }
 
@@ -1436,6 +1447,8 @@ function startDatabaseSync() {
 
   dbRef.on('value', snapshot => {
     const data = snapshot.val();
+    console.log('[onValue] received from Firebase, entries:', data?.entries?.length || 0,
+      '| sample dates:', (data?.entries || []).slice(0,3).map(e => e.date));
     if (!data) {
       // Empty database — push whatever we have locally (first-time setup)
       if (db.entries.length || db.stores.length) pushSync();
