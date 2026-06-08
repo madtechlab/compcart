@@ -1395,41 +1395,23 @@ function localLoad() {
 function pushSync(immediate) {
   db.shoppingList = shoppingList;
   localSave();
-  if (!firebase.auth().currentUser) { _pendingSync = true; return; }
-  if (!navigator.onLine) {
-    _pendingSync = true;
-    showOfflineBanner(true);
-    return;
-  }
-  // immediate=true skips debounce — used for critical saves like entry edits
+  if (!firebase.auth().currentUser) return;
+  if (!navigator.onLine) { showOfflineBanner(true); return; }
   clearTimeout(_syncTimer);
   const delay = immediate ? 0 : 300;
   _syncTimer = setTimeout(() => {
     dbRef.update({
-      stores:          db.stores,
-      entries:         db.entries,
-      shoppingList:    db.shoppingList,
-      _schemaVersion:  CURRENT_SCHEMA_VERSION
-    }).then(() => {
-      _pendingSync = false;
-    }).catch(err => {
-      _pendingSync = true;
-      logError('pushSync', err);
-    });
+      stores:         db.stores,
+      entries:        db.entries,
+      shoppingList:   db.shoppingList,
+      _schemaVersion: CURRENT_SCHEMA_VERSION
+    }).catch(err => logError('pushSync', err));
   }, delay);
 }
 
 window.addEventListener('online', () => {
   showOfflineBanner(false);
-  if (_pendingSync && firebase.auth().currentUser) {
-    _pendingSync = false;
-    dbRef.update({
-      stores:          db.stores,
-      entries:         db.entries,
-      shoppingList:    db.shoppingList,
-      _schemaVersion:  CURRENT_SCHEMA_VERSION
-    }).then(() => toast('Synced after reconnect ✓')).catch(() => {});
-  }
+  pushSync(); // flush any changes made while offline
 });
 
 window.addEventListener('offline', () => showOfflineBanner(true));
@@ -1441,80 +1423,55 @@ function showOfflineBanner(show) {
 
 /*
  * startDatabaseSync — called only after anonymous auth succeeds.
- * Everything that touches the database lives here.
+ *
+ * Simple model:
+ *   - Firebase is the single source of truth
+ *   - onValue just READS — never writes back
+ *   - pushSync only called when user makes an explicit change
+ *   - localStorage is just a read-ahead cache for fast startup
  */
 function startDatabaseSync() {
-  // Seed from localStorage immediately so app is usable before Firebase responds
-  localLoad();
+  localLoad();   // seed UI from cache while Firebase loads
   refreshAll();
 
   dbRef.on('value', snapshot => {
     const data = snapshot.val();
-    if (data) {
-      if (_pendingSync) {
-        // We have local changes that haven't reached Firebase yet — push them now
-        _pendingSync = false;
-        dbRef.update({
-          stores:          db.stores,
-          entries:         db.entries,
-          shoppingList:    db.shoppingList,
-          _schemaVersion:  CURRENT_SCHEMA_VERSION
-        });
-      } else {
-        let incoming = {
-          stores:       data.stores       || [],
-          entries:      data.entries      || [],
-          shoppingList: data.shoppingList || []
-        };
-        incoming = runMigrations(incoming);
-
-        // On a clean load with no pending local changes, Firebase is the
-        // source of truth — just take it. Only merge when we have genuinely
-        // pending local writes that haven't reached Firebase yet.
-        if (_pendingSync) {
-          // We have local changes — merge: keep whichever entry date is newer
-          const localById = {};
-          db.entries.forEach(e => { localById[String(e.id)] = e; });
-
-          incoming.entries = incoming.entries.map(incomingEntry => {
-            const local = localById[String(incomingEntry.id)];
-            if (!local) return incomingEntry;
-            // If local has no date but incoming does, always take incoming
-            if (!local.date && incomingEntry.date) return incomingEntry;
-            const incomingDate = incomingEntry.date || '0000-00-00';
-            const localDate    = local.date          || '0000-00-00';
-            return localDate > incomingDate ? local : incomingEntry;
-          });
-          // Keep local-only entries not in Firebase yet
-          const incomingIds = new Set(incoming.entries.map(e => String(e.id)));
-          db.entries.forEach(e => {
-            if (!incomingIds.has(String(e.id))) incoming.entries.push(e);
-          });
-          _pendingSync = false;
-          // Push merged result back so Firebase has the complete picture
-          setTimeout(() => pushSync(), 100);
-        }
-
-        db           = incoming;
-        shoppingList = db.shoppingList;
-        localSave();
-        if ((data._schemaVersion || 0) < CURRENT_SCHEMA_VERSION) pushSync();
-      }
-    } else {
-      // No data in Firebase yet — push our local data up
-      pushSync();
+    if (!data) {
+      // Empty database — push whatever we have locally (first-time setup)
+      if (db.entries.length || db.stores.length) pushSync();
+      return;
     }
+
+    // Just take Firebase data — no merging, no pushing back
+    let incoming = {
+      stores:       data.stores       || [],
+      entries:      data.entries      || [],
+      shoppingList: data.shoppingList || []
+    };
+    incoming = runMigrations(incoming);
+
+    // Only migrate schema if genuinely needed — don't push otherwise
+    const needsSchemaPush = (data._schemaVersion || 0) < CURRENT_SCHEMA_VERSION;
+
+    db           = incoming;
+    shoppingList = db.shoppingList;
+    localSave();
+
+    if (needsSchemaPush) {
+      // Schema migration only — don't loop push on every receive
+      dbRef.update({ _schemaVersion: CURRENT_SCHEMA_VERSION });
+    }
+
     invalidateCache();
     lastSyncTime = new Date();
     setSyncStatus(true);
     showOfflineBanner(false);
     refreshAll();
+
   }, err => {
     logError('firebase.onValue', err);
     const label = document.getElementById('sync-label');
     if (label) label.textContent = 'DB error — check rules';
-    const badge = document.getElementById('sync-badge');
-    if (badge) badge.className = 'sync-badge offline';
     setSyncStatus(false);
   });
 }
