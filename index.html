@@ -316,8 +316,8 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--green-60
 #offline-banner.show{display:block}
 
 /* TOAST */
-#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--green-800);color:var(--white);padding:12px 22px;border-radius:20px;font-size:14px;font-weight:500;z-index:999;transition:transform 0.3s;pointer-events:none;white-space:normal;max-width:80vw;text-align:center;line-height:1.4}
-#toast.show{transform:translateX(-50%) translateY(0)}
+#toast{position:fixed;top:80px;left:50%;transform:translateX(-50%) translateY(-120px);background:var(--green-800);color:var(--white);padding:14px 24px;border-radius:20px;font-size:15px;font-weight:500;z-index:9998;transition:transform 0.25s ease-out,opacity 0.25s;pointer-events:none;white-space:normal;max-width:80vw;text-align:center;line-height:1.4;opacity:0}
+#toast.show{transform:translateX(-50%) translateY(0);opacity:1}
 
 /* SECTION */
 .section{display:none}.section.active{display:block}
@@ -2056,6 +2056,8 @@ function saveEdit(id) {
   }
   _lastCat = cat;
   localStorage.setItem('last_cat', cat);
+  // Show toast first — must be before updateDB/refreshAll so iOS doesn't lose it during re-render
+  toast('✓ Updated!');
   updateDB(db => {
     const e = db.entries.find(x => String(x.id) === sid);
     if (!e) return;
@@ -2072,10 +2074,8 @@ function saveEdit(id) {
     e.sizeOz    = size ? size.value : e.sizeOz;
     e.sizeUnit  = size ? size.unit  : e.sizeUnit;
     e.unitPrice = size ? newPrice / size.value : null;
-  }, true); // immediate=true — write to Firebase right away
-  // Show toast after update so it appears over the re-rendered UI
-  requestAnimationFrame(() => toast('✓ Updated!'));
-  setTimeout(() => flashCard(sid), 150);
+  }, true);
+  setTimeout(() => flashCard(sid), 200);
 }
 
 function toggleHistory(id) {
