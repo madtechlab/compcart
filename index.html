@@ -549,11 +549,9 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--green-60
   <div class="content">
     <div class="card">
       <div class="card-title">This week's list</div>
-      <div class="field" style="display:flex;gap:8px">
-        <input type="text" id="sl-input" placeholder="Add item…" oninput="showSlSuggestions(this.value)" autocomplete="off" style="flex:1" onkeydown="if(event.key==='Enter')addToList()">
-        <button class="btn btn-primary btn-sm" onclick="addToList()" style="width:auto;padding:11px 16px">Add</button>
+      <div style="font-size:13px;color:var(--gray-500);margin-bottom:12px">
+        Tap the 🛒 icon on any item in the <b>Prices</b> tab to add it here. The app will automatically route each item to its cheapest store.
       </div>
-      <div id="sl-suggestions" style="margin-top:-6px;margin-bottom:8px"></div>
       <div class="trip-threshold">
         <span>Min. saving worth a separate trip:</span>
         <input type="range" id="trip-min" min="0" max="20" step="0.5"
@@ -932,8 +930,8 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--green-60
         <div class="help-step">
           <div class="help-step-num">1</div>
           <div class="help-step-content">
-            <div class="help-step-title">Go to the Shop tab 🛒</div>
-            <div class="help-step-desc">Type an item name and tap <b>Add</b> — or tap the cart icon on any price entry</div>
+            <div class="help-step-title">Add items from the Prices tab 🏷️</div>
+            <div class="help-step-desc">Tap the 🛒 cart icon on any price entry — the item is added to your list and automatically routed to its cheapest store</div>
           </div>
         </div>
         <div class="help-step">
@@ -2580,56 +2578,21 @@ function saveShoppingList() {
   pushSync();
 }
 
-function addToList() {
-  const input = document.getElementById('sl-input');
-  const val   = input.value.trim();
-  if (!val) return;
-  document.getElementById('sl-suggestions').innerHTML = '';
-  // Normalize at entry time so it matches the normalized entry names in the price DB
-  const normalizedVal = normalizeItemName(val);
-  if (shoppingList.find(i => i.name === normalizedVal)) {
-    toast('Already in list'); input.value = ''; return;
-  }
-  shoppingList.push({ name: normalizedVal, checked: false, id: newId() });
-  saveShoppingList();
-  input.value = '';
-  renderShoppingList();
-}
-
-// #5: quick-add from Prices search results
+// addToListByName — called from the cart icon on price entries
 window.addToListByName = function(name) {
   const normalized = normalizeItemName(name);
   if (shoppingList.find(i => i.name === normalized)) {
     toast('Already on list'); return;
   }
-  // Confirm before adding — prevents accidental adds when tapping near edit
   if (!confirm(`Add "${normalized}" to your shopping list?`)) return;
   shoppingList.push({ name: normalized, checked: false, id: newId() });
   saveShoppingList();
-  toast(`✓ "${normalized}" added to shopping list`);
-};
-
-function showSlSuggestions(val) {
-  const el = document.getElementById('sl-suggestions');
-  if (val.length < 2) { el.innerHTML = ''; return; }
-  const names  = [...new Set(db.entries.map(e => e.name))];
-  const inList = new Set(shoppingList.map(i => i.name));
-  const matches= names.filter(n => n.toLowerCase().includes(val.toLowerCase()) && !inList.has(n)).slice(0,5);
-  if (!matches.length) { el.innerHTML = ''; return; }
-  el.innerHTML = matches.map(n =>
-    `<div onclick="pickSlSuggestion('${n.replace(/'/g,"\\'")}')"`+
-    ` style="padding:8px 12px;font-size:13px;color:var(--gray-700);cursor:pointer;border:1px solid var(--gray-200);border-top:none;background:var(--white)">${n}</div>`
-  ).join('');
-}
-
-window.pickSlSuggestion = function(name) {
-  document.getElementById('sl-input').value = name;
-  document.getElementById('sl-suggestions').innerHTML = '';
-  addToList();
+  toast(`✓ "${normalized}" added`);
 };
 
 function toggleChecked(id) {
-  const item = shoppingList.find(i => i.id === id);
+  const sid  = String(id);
+  const item = shoppingList.find(i => String(i.id) === sid);
   if (item) {
     item.checked = !item.checked;
     updateDB(db => { db.shoppingList = shoppingList; });
@@ -2638,7 +2601,8 @@ function toggleChecked(id) {
 }
 
 function removeFromList(id) {
-  shoppingList = shoppingList.filter(i => i.id !== id);
+  const sid    = String(id);
+  shoppingList = shoppingList.filter(i => String(i.id) !== sid);
   updateDB(db => { db.shoppingList = shoppingList; });
   renderShoppingList();
 }
@@ -3125,10 +3089,8 @@ window.clearImportList= clearImportList;
 window.handleImport   = handleImport;
 window.checkFuzzy     = checkFuzzy;
 window.acceptFuzzy    = acceptFuzzy;
-window.addToList      = addToList;
 window.clearChecked   = clearChecked;
 window.clearAllList   = clearAllList;
-window.showSlSuggestions = showSlSuggestions;
 window.updateTripLabel= updateTripLabel;
 window.exportData     = exportData;
 window.exportCSV      = exportCSV;
