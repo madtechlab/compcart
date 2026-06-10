@@ -3499,7 +3499,8 @@ let _chartEntry    = null;
 let _chartRange    = 30;
 
 function openChartModal(id) {
-  const entry = db.entries.find(e => e.id === id);
+  const sid   = String(id);
+  const entry = db.entries.find(e => String(e.id) === sid);
   if (!entry) return;
   _chartEntry = entry;
   _chartRange = 30;
