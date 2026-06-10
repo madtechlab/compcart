@@ -2004,6 +2004,50 @@ function removeEntry(id) {
   updateDB(db => { db.entries = db.entries.filter(e => String(e.id) !== sid); });
 }
 
+function duplicateEntry(id) {
+  const sid   = String(id);
+  const entry = db.entries.find(e => String(e.id) === sid);
+  if (!entry) return;
+
+  // Close any open edit overlay first
+  document.querySelectorAll('.edit-overlay.open').forEach(el => el.classList.remove('open'));
+
+  // Switch to Prices tab — this rebuilds the DOM
+  showTab('prices');
+
+  // Wait for tab switch and DOM rebuild before filling the form
+  setTimeout(() => {
+    const nameEl  = document.getElementById('p-name');
+    const priceEl = document.getElementById('p-price');
+    const catEl   = document.getElementById('p-cat');
+    const dateEl  = document.getElementById('p-date');
+
+    if (nameEl)  nameEl.value  = entry.name;
+    if (priceEl) priceEl.value = '';    // leave blank — user enters the new store's price
+    if (dateEl)  dateEl.value  = today();
+
+    // Match category
+    if (catEl) {
+      for (let i = 0; i < catEl.options.length; i++) {
+        if (catEl.options[i].value === (entry.cat || 'Other')) {
+          catEl.selectedIndex = i; break;
+        }
+      }
+    }
+
+    // Also pre-select the last-used store so user just needs to change if different
+    refreshStoreSelects();
+
+    // Scroll to top then focus price field
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setTimeout(() => {
+      priceEl?.focus();
+      toast('📋 Name copied — select store and enter price');
+    }, 300);
+  }, 100); // wait for tab DOM rebuild
+}
+window.duplicateEntry = duplicateEntry;
+
 function startEdit(id) {
   const sid = String(id);
   document.querySelectorAll('.edit-overlay.open').forEach(el => el.classList.remove('open'));
@@ -2396,6 +2440,10 @@ function entryCardHtml(e, cache) {
         <button class="btn btn-primary" onclick="saveEdit(${eid})">Save</button>
         <button class="btn btn-ghost"   onclick="cancelEdit(${eid})">✕ Cancel</button>
       </div>
+      <button class="btn btn-ghost" onclick="duplicateEntry(${eid})"
+        style="width:100%;margin-top:8px;font-size:13px;color:var(--green-700);border-color:var(--green-200)">
+        📋 Copy to compare at another store
+      </button>
     </div>
   </div>`;
 }
