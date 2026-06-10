@@ -560,7 +560,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--green-60
         <span id="trip-label" style="font-weight:600;color:var(--green-700);min-width:36px">$3.00</span>
       </div>
       <div class="btn-row">
-        <button class="btn btn-ghost btn-sm" onclick="clearChecked()">Clear checked</button>
+        <button class="btn btn-ghost btn-sm" onclick="clearChecked()">Remove checked</button>
         <button class="btn btn-ghost btn-sm" onclick="clearAllList()">Clear all</button>
       </div>
     </div>
@@ -2596,7 +2596,7 @@ function toggleChecked(id) {
   if (item) {
     item.checked = !item.checked;
     updateDB(db => { db.shoppingList = shoppingList; });
-    renderShoppingList();
+    // updateDB calls refreshAll which calls renderShoppingList — no need to call again
   }
 }
 
@@ -2604,13 +2604,13 @@ function removeFromList(id) {
   const sid    = String(id);
   shoppingList = shoppingList.filter(i => String(i.id) !== sid);
   updateDB(db => { db.shoppingList = shoppingList; });
-  renderShoppingList();
 }
 
 function clearChecked() {
+  if (!shoppingList.some(i => i.checked)) { toast('No items checked'); return; }
+  if (!confirm('Remove all checked items from your list?')) return;
   shoppingList = shoppingList.filter(i => !i.checked);
   updateDB(db => { db.shoppingList = shoppingList; });
-  renderShoppingList();
 }
 
 function clearAllList() {
@@ -2750,16 +2750,17 @@ function renderShoppingList() {
       const cheaperAt = i.allPrices
         .filter(p => p.store !== store && p.price < i.price)
         .sort((a,b) => a.price - b.price)[0];
+      const iid = `'${String(i.listItem.id)}'`;
       return `
         <div class="sl-item ${i.listItem.checked ? 'checked-off' : ''}">
-          <input type="checkbox" ${i.listItem.checked?'checked':''} onchange="toggleChecked(${i.listItem.id})">
+          <input type="checkbox" ${i.listItem.checked?'checked':''} onchange="toggleChecked(${iid})">
           <div style="flex:1;min-width:0">
             <div class="sl-item-name">${escapeHtml(i.listItem.name)}</div>
             ${i.matchedName !== i.listItem.name ? `<div style="font-size:11px;color:var(--gray-400)">matched: ${escapeHtml(i.matchedName)}</div>` : ''}
             ${cheaperAt ? `<div style="font-size:11px;color:#b45309">also at ${escapeHtml(cheaperAt.store)}: $${cheaperAt.price.toFixed(2)}</div>` : ''}
           </div>
           <div class="sl-item-meta">$${i.price.toFixed(2)}</div>
-          <button class="icon-btn danger" onclick="removeFromList(${i.listItem.id})" style="padding:4px">
+          <button class="icon-btn danger" onclick="removeFromList(${iid})" style="padding:4px">
             <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>
         </div>`;
@@ -2781,15 +2782,18 @@ function renderShoppingList() {
         <div style="font-size:13px;color:var(--amber-600);background:var(--amber-100);border-radius:var(--radius-md);padding:8px 12px;margin-bottom:8px">
           💡 Add prices for these items in the Prices tab to get store recommendations and cost estimates.
         </div>
-        ${unknown.map(li => `
+        ${unknown.map(li => {
+          const uid = `'${String(li.id)}'`;
+          return `
           <div class="sl-item ${li.checked ? 'checked-off' : ''}">
-            <input type="checkbox" ${li.checked?'checked':''} onchange="toggleChecked(${li.id})">
+            <input type="checkbox" ${li.checked?'checked':''} onchange="toggleChecked(${uid})">
             <div class="sl-item-name" style="flex:1">${escapeHtml(li.name)}</div>
             <div class="sl-item-meta" style="color:var(--gray-300)">—</div>
-            <button class="icon-btn danger" onclick="removeFromList(${li.id})" style="padding:4px">
+            <button class="icon-btn danger" onclick="removeFromList(${uid})" style="padding:4px">
               <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
-          </div>`).join('')}
+          </div>`;
+        }).join('')}
       </div>` : '';
 
   el.innerHTML = bannerHtml + storeHtml + unknownHtml;
