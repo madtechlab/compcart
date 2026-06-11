@@ -511,6 +511,22 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--green-60
           <input type="date" id="p-date">
         </div>
       </div>
+      <div class="row-2">
+        <div class="field">
+          <label>Size <span style="font-weight:400;color:var(--gray-400)">(for $/oz compare — optional)</span></label>
+          <input type="number" id="p-size" placeholder="e.g. 28" step="any" min="0" inputmode="decimal" oninput="this.dataset.userEdited='1'">
+        </div>
+        <div class="field">
+          <label>Size unit</label>
+          <select id="p-size-unit">
+            <option value="oz">oz</option>
+            <option value="lb">lb</option>
+            <option value="g">g</option>
+            <option value="ml">ml</option>
+            <option value="ct">count</option>
+          </select>
+        </div>
+      </div>
       <button class="btn btn-primary" id="btn-add-entry" onclick="addEntry()">+ Add price entry</button>
     </div>
     <div class="search-bar">
@@ -523,7 +539,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--green-60
         <option value="recent">Recently changed</option>
       </select>
       <!-- Item 4: pricing mode toggle -->
-      <button id="pricing-mode-btn" class="btn btn-ghost btn-sm" onclick="togglePricingMode()" style="width:auto;white-space:nowrap" title="Switch between total price and unit price comparisons">$/total</button>
+      <button id="pricing-mode-btn" class="btn btn-ghost btn-sm" onclick="togglePricingMode()" style="width:auto;white-space:nowrap" title="Switch between total price and unit price comparisons">Compare: total</button>
     </div>
     <div class="filter-row" id="cat-filters"></div>
     <!-- Item 6: age filter chips -->
@@ -532,12 +548,11 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--green-60
       <button class="filter-chip age-chip"        data-age="30" onclick="setAgeFilter(30)">≤ 30d</button>
       <button class="filter-chip age-chip"        data-age="60" onclick="setAgeFilter(60)">≤ 60d</button>
     </div>
-    <!-- Improvement 1: unit display chips -->
-    <div class="filter-row" id="unit-filters">
-      <span style="font-size:12px;color:var(--gray-400);align-self:center">Unit:</span>
-      <button class="filter-chip unit-chip active" data-unit="oz"   onclick="setUnitDisplay('oz')"  >$/oz</button>
-      <button class="filter-chip unit-chip"        data-unit="lb"   onclick="setUnitDisplay('lb')"  >$/lb</button>
-      <button class="filter-chip unit-chip"        data-unit="item" onclick="setUnitDisplay('item')">$/item</button>
+    <!-- Unit display chips — only shown when $/unit comparison mode is ON -->
+    <div class="filter-row" id="unit-filters" style="display:none">
+      <span style="font-size:12px;color:var(--gray-400);align-self:center">Show prices per:</span>
+      <button class="filter-chip unit-chip active" data-unit="oz"   onclick="setUnitDisplay('oz')"  >oz</button>
+      <button class="filter-chip unit-chip"        data-unit="lb"   onclick="setUnitDisplay('lb')"  >lb</button>
     </div>
     <div id="prices-list" aria-live="polite" aria-label="Price entries"></div>
     <div class="bottom-spacer"></div>
@@ -1808,17 +1823,18 @@ function escapeHtml(str) {
 
 function unitPriceDisplay(entry) {
   if (!entry.unitPrice || !entry.sizeOz) return null;
+  // Count-based items always show $/item regardless of selected display unit
+  if (entry.sizeUnit === 'ct') {
+    return { value: (entry.price / entry.sizeOz).toFixed(2), label: 'item' };
+  }
   switch(_unitDisplay) {
     case 'lb':
-      // 16 oz per lb
       return { value: (entry.price / (entry.sizeOz / 16)).toFixed(2), label: 'lb' };
     case 'item':
-      // treat each count as one "item"
-      return entry.sizeUnit === 'ct'
-        ? { value: (entry.price / entry.sizeOz).toFixed(2), label: 'item' }
-        : null;
+      // not a count item — fall back to oz so the price doesn't vanish
+      return { value: entry.unitPrice.toFixed(2), label: 'oz' };
     default: // 'oz'
-      return { value: entry.unitPrice.toFixed(2), label: entry.sizeUnit || 'oz' };
+      return { value: entry.unitPrice.toFixed(2), label: 'oz' };
   }
 }
 
@@ -1831,12 +1847,6 @@ window.setUnitDisplay = function(unit) {
   invalidateCache();
   renderPrices();
 };
-
-function staleTag(dateStr) {
-  const days = (Date.now() - new Date(dateStr)) / 86400000;
-  if (days > 60) return `<span class="stale-tag">⚠ ${Math.floor(days)}d old</span>`;
-  return '';
-}
 
 function extractSize(name) {
   if (!name) return null;
@@ -1851,6 +1861,36 @@ function extractSize(name) {
   const ctMatch  = name.match(/(\d+)\s*(count|ct|pack|pk)\b/i);
   if (ctMatch)  return { value: parseFloat(ctMatch[1]),          unit:'ct' };
   return null;
+}
+
+// Like extractSize but keeps the ORIGINAL unit — used to pre-fill the Size form fields
+function extractSizeRaw(name) {
+  if (!name) return null;
+  const oz = name.match(/(\d+(\.\d+)?)\s*(oz|ounce)/i);
+  if (oz) return { value: parseFloat(oz[1]), unit:'oz' };
+  const lb = name.match(/(\d+(\.\d+)?)\s*(lb|pound)/i);
+  if (lb) return { value: parseFloat(lb[1]), unit:'lb' };
+  const g  = name.match(/(\d+(\.\d+)?)\s*g\b/i);
+  if (g)  return { value: parseFloat(g[1]),  unit:'g' };
+  const ml = name.match(/(\d+(\.\d+)?)\s*ml\b/i);
+  if (ml) return { value: parseFloat(ml[1]), unit:'ml' };
+  const ct = name.match(/(\d+)\s*(count|ct|pack|pk)\b/i);
+  if (ct) return { value: parseFloat(ct[1]), unit:'ct' };
+  return null;
+}
+
+// Convert explicit form size (value + unit) to the normalized internal format:
+// sizeOz in ounces (or count for 'ct'), sizeUnit 'oz'|'ct'
+function sizeFromForm(value, unit) {
+  const v = parseFloat(value);
+  if (!v || v <= 0) return null;
+  switch (unit) {
+    case 'lb': return { value: v * 16,      unit: 'oz' };
+    case 'g':  return { value: v * 0.03527, unit: 'oz' };
+    case 'ml': return { value: v * 0.0338,  unit: 'oz' };
+    case 'ct': return { value: v,           unit: 'ct' };
+    default:   return { value: v,           unit: 'oz' };
+  }
 }
 
 function normalizeItemName(name) {
@@ -1884,6 +1924,15 @@ function checkFuzzy(val) {
   _fuzzyMatch = null;
   const hint = document.getElementById('fuzzy-hint');
   hint.style.display = 'none';
+
+  // Auto-fill size fields when a size is detected in the name (unless user typed their own)
+  const sizeEl = document.getElementById('p-size');
+  const unitEl = document.getElementById('p-size-unit');
+  if (sizeEl && unitEl && !sizeEl.dataset.userEdited) {
+    const s = extractSizeRaw(val);
+    if (s) { sizeEl.value = s.value; unitEl.value = s.unit; }
+  }
+
   if (val.length < 3) return;
   const names = [...new Set(db.entries.map(e => e.name))];
   const normalized = normalizeItemName(val);
@@ -1927,7 +1976,10 @@ function addEntry() {
   localStorage.setItem('last_store', store);
   localStorage.setItem('last_cat',   cat);
 
-  const size           = extractSize(name);
+  // Size: prefer the explicit Size form fields; fall back to parsing the name
+  const formSizeVal  = document.getElementById('p-size')?.value;
+  const formSizeUnit = document.getElementById('p-size-unit')?.value || 'oz';
+  const size         = sizeFromForm(formSizeVal, formSizeUnit) || extractSize(name);
   const normalizedName = normalizeItemName(name);
   const existing       = db.entries.find(e => e.name === normalizedName && e.store === store);
 
@@ -1981,6 +2033,8 @@ function addEntry() {
 
   document.getElementById('p-name').value  = '';
   document.getElementById('p-price').value = '';
+  const sEl = document.getElementById('p-size');
+  if (sEl) { sEl.value = ''; delete sEl.dataset.userEdited; }
   document.getElementById('fuzzy-hint').style.display = 'none';
   setTimeout(() => {
     setLoading('btn-add-entry', false);
@@ -2025,6 +2079,20 @@ function duplicateEntry(id) {
     if (nameEl)  nameEl.value  = entry.name;
     if (priceEl) priceEl.value = '';    // leave blank — user enters the new store's price
     if (dateEl)  dateEl.value  = today();
+
+    // Carry the size over so unit pricing works for the copy
+    const sizeEl = document.getElementById('p-size');
+    const unitEl = document.getElementById('p-size-unit');
+    if (sizeEl && unitEl) {
+      if (entry.sizeOz) {
+        sizeEl.value = entry.sizeUnit === 'ct' ? entry.sizeOz : entry.sizeOz.toFixed(1);
+        unitEl.value = entry.sizeUnit === 'ct' ? 'ct' : 'oz';
+        sizeEl.dataset.userEdited = '1'; // don't let name autofill overwrite it
+      } else {
+        sizeEl.value = '';
+        delete sizeEl.dataset.userEdited;
+      }
+    }
 
     // Match category
     if (catEl) {
@@ -2097,13 +2165,21 @@ function saveEdit(id) {
       e.history.unshift({ price: e.price, date: e.date || null });
     }
     if (e.history.length > 10) e.history = e.history.slice(0, 10);
-    const size  = extractSize(newName);
+
+    // Size: explicit form fields take priority, then name parse, then keep existing
+    const formVal  = document.getElementById('es-'  + sid)?.value;
+    const formUnit = document.getElementById('esu-' + sid)?.value || 'oz';
+    const fromForm = sizeFromForm(formVal, formUnit);
+    const fromName = extractSize(newName);
+    const size     = fromForm || fromName ||
+                     (e.sizeOz ? { value: e.sizeOz, unit: e.sizeUnit || 'oz' } : null);
+
     e.price     = newPrice;
     e.name      = normalizeItemName(newName);
     e.cat       = cat;
     e.date      = newDate;
-    e.sizeOz    = size ? size.value : e.sizeOz;
-    e.sizeUnit  = size ? size.unit  : e.sizeUnit;
+    e.sizeOz    = size ? size.value : null;
+    e.sizeUnit  = size ? size.unit  : null;
     e.unitPrice = size ? newPrice / size.value : null;
   }, true);
   setTimeout(() => flashCard(sid), 200);
@@ -2202,19 +2278,28 @@ window.debouncedRenderPrices = debouncedRenderPrices;
 function togglePricingMode() {
   _pricingMode = _pricingMode === 'total' ? 'unit' : 'total';
   localStorage.setItem('pricing_mode', _pricingMode);
-  const btn = document.getElementById('pricing-mode-btn');
-  if (btn) {
-    const isUnit = _pricingMode === 'unit';
-    btn.textContent  = isUnit ? '$/unit — ON' : '$/unit — OFF';
-    btn.title        = isUnit ? 'Comparing by unit price ($/oz). Tap to switch to total price.' : 'Comparing by total price. Tap to switch to unit price ($/oz).';
-    btn.style.background = isUnit ? 'var(--green-700)' : '';
-    btn.style.color      = isUnit ? 'var(--white)'     : '';
-    btn.style.borderColor= isUnit ? 'var(--green-700)' : '';
-  }
+  syncPricingModeUI();
   invalidateCache();
   renderPrices();
 }
 window.togglePricingMode = togglePricingMode;
+
+// One place that keeps the button + unit chip row in sync with state
+function syncPricingModeUI() {
+  const isUnit = _pricingMode === 'unit';
+  const btn = document.getElementById('pricing-mode-btn');
+  if (btn) {
+    btn.textContent  = isUnit ? 'Compare: $/unit' : 'Compare: total';
+    btn.title        = isUnit
+      ? 'Best price is decided by unit price ($/oz). Tap to compare by total price.'
+      : 'Best price is decided by total price. Tap to compare by unit price ($/oz).';
+    btn.style.background = isUnit ? 'var(--green-700)' : '';
+    btn.style.color      = isUnit ? 'var(--white)'     : '';
+    btn.style.borderColor= isUnit ? 'var(--green-700)' : '';
+  }
+  const unitRow = document.getElementById('unit-filters');
+  if (unitRow) unitRow.style.display = isUnit ? '' : 'none';
+}
 
 // Item 6: age filter
 window.setAgeFilter = function(days) {
@@ -2252,18 +2337,11 @@ function renderPrices() {
   // Build category filter chips
   renderCatFilters(cache.cats);
 
-  // Restore unit display and pricing mode chip states on every render
+  // Restore unit display chips and pricing mode UI on every render
   document.querySelectorAll('.unit-chip').forEach(b =>
     b.classList.toggle('active', b.dataset.unit === _unitDisplay)
   );
-  const pmBtn = document.getElementById('pricing-mode-btn');
-  if (pmBtn) {
-    const isUnit = _pricingMode === 'unit';
-    pmBtn.textContent   = isUnit ? '$/unit — ON' : '$/unit — OFF';
-    pmBtn.style.background  = isUnit ? 'var(--green-700)' : '';
-    pmBtn.style.color        = isUnit ? 'var(--white)'     : '';
-    pmBtn.style.borderColor  = isUnit ? 'var(--green-700)' : '';
-  }
+  syncPricingModeUI();
 
   // Determine which entries to show
   let entries = db.entries.filter(e => {
@@ -2274,13 +2352,14 @@ function renderPrices() {
     return true;
   });
 
-  // Sort — added 'recent' for today-first; stable tiebreaker by id
+  // Sort — stable tiebreaker via String compare (ids are mixed numeric/UUID)
+  const idCmp = (a, b) => String(a.id).localeCompare(String(b.id));
   entries = [...entries].sort((a, b) => {
-    if (sortBy === 'price-asc')  return a.price - b.price           || a.id - b.id;
-    if (sortBy === 'price-desc') return b.price - a.price           || a.id - b.id;
-    if (sortBy === 'date')       return (b.date || '').localeCompare(a.date || '') || a.id - b.id;
-    if (sortBy === 'recent')     return staleDays(a.date) - staleDays(b.date)      || a.id - b.id;
-    return a.name.localeCompare(b.name) || a.price - b.price || a.id - b.id;
+    if (sortBy === 'price-asc')  return a.price - b.price           || idCmp(a, b);
+    if (sortBy === 'price-desc') return b.price - a.price           || idCmp(a, b);
+    if (sortBy === 'date')       return (b.date || '').localeCompare(a.date || '') || idCmp(a, b);
+    if (sortBy === 'recent')     return staleDays(a.date) - staleDays(b.date)      || idCmp(a, b);
+    return a.name.localeCompare(b.name) || a.price - b.price || idCmp(a, b);
   });
 
   if (!entries.length) {
@@ -2435,6 +2514,16 @@ function entryCardHtml(e, cache) {
         <input type="text" id="ed-${e.id}" value="${e.date||today()}"
           placeholder="${today()}"
           pattern="\\d{4}-\\d{2}-\\d{2}">
+      </div>
+      <div class="edit-date-row">
+        <label>Size:</label>
+        <input type="number" id="es-${e.id}" step="any" min="0" inputmode="decimal"
+          value="${e.sizeUnit === 'ct' ? (e.sizeOz ?? '') : (e.sizeOz != null ? e.sizeOz.toFixed(1) : '')}"
+          placeholder="e.g. 28" style="font-family:var(--font-body)">
+        <select id="esu-${e.id}" style="padding:12px 10px;font-size:16px;border:1.5px solid var(--gray-300);border-radius:var(--radius-sm);background:var(--white)">
+          <option value="oz" ${(e.sizeUnit||'oz')==='oz'?'selected':''}>oz</option>
+          <option value="ct" ${e.sizeUnit==='ct'?'selected':''}>count</option>
+        </select>
       </div>
       <div class="edit-actions">
         <button class="btn btn-primary" onclick="saveEdit(${eid})">Save</button>
