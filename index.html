@@ -2520,15 +2520,34 @@ function entryCardHtml(e, cache) {
       <div style="margin-top:8px">
         <label style="font-size:13px;color:var(--gray-500);display:block;margin-bottom:6px">Size (for $/oz comparison)</label>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-          <input type="number" id="es-${e.id}" step="any" min="0" inputmode="decimal"
-            value="${e.sizeUnit === 'ct' ? (e.sizeOz ?? '') : (e.sizeOz != null ? e.sizeOz.toFixed(1) : '')}"
-            placeholder="Amount (e.g. 18)"
-            style="width:100%;padding:12px 14px;font-size:16px;border:1.5px solid var(--gray-300);border-radius:var(--radius-sm);background:var(--white);box-sizing:border-box">
-          <select id="esu-${e.id}"
-            style="width:100%;padding:12px 10px;font-size:16px;border:1.5px solid var(--gray-300);border-radius:var(--radius-sm);background:var(--white);box-sizing:border-box">
-            <option value="oz"  ${(e.sizeUnit||'oz')==='oz'?'selected':''}>oz</option>
-            <option value="ct"  ${e.sizeUnit==='ct'?'selected':''}>count (ct)</option>
-          </select>
+          ${(() => {
+            // Show original-friendly units: if stored in oz and value is a multiple of 16, show as lb
+            let dispVal = '', dispUnit = 'oz';
+            if (e.sizeUnit === 'ct') {
+              dispVal = e.sizeOz != null ? String(e.sizeOz) : '';
+              dispUnit = 'ct';
+            } else if (e.sizeOz != null) {
+              if (e.sizeOz >= 16 && e.sizeOz % 16 === 0) {
+                dispVal = String(e.sizeOz / 16);
+                dispUnit = 'lb';
+              } else {
+                dispVal = e.sizeOz.toFixed(1);
+                dispUnit = 'oz';
+              }
+            }
+            return `
+            <input type="number" id="es-${e.id}" step="any" min="0" inputmode="decimal"
+              value="${dispVal}" placeholder="Amount (e.g. 18)"
+              style="width:100%;padding:12px 14px;font-size:16px;border:1.5px solid var(--gray-300);border-radius:var(--radius-sm);background:var(--white);box-sizing:border-box">
+            <select id="esu-${e.id}"
+              style="width:100%;padding:12px 10px;font-size:16px;border:1.5px solid var(--gray-300);border-radius:var(--radius-sm);background:var(--white);box-sizing:border-box">
+              <option value="oz"  ${dispUnit==='oz'?'selected':''}>oz</option>
+              <option value="lb"  ${dispUnit==='lb'?'selected':''}>lb</option>
+              <option value="g"   ${dispUnit==='g'?'selected':''}>g</option>
+              <option value="ml"  ${dispUnit==='ml'?'selected':''}>ml</option>
+              <option value="ct"  ${dispUnit==='ct'?'selected':''}>count (ct)</option>
+            </select>`;
+          })()}
         </div>
       </div>
       <div class="edit-actions">
