@@ -722,9 +722,9 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--green-60
       <p style="font-size:14px;color:var(--gray-500);margin-bottom:14px">Tap to photograph a price tag, shelf label, or receipt. AI reads the prices automatically.</p>
       <div class="upload-zone" onclick="document.getElementById('img-input').click()">
         <div class="uz-icon">📸</div>
-        <p>Tap to choose a photo</p>
+        <p>Tap to take a photo or choose from library</p>
         <div class="hint">Price tag, shelf label, or receipt</div>
-        <input type="file" id="img-input" accept="image/*" capture="environment" style="display:none" onchange="handleImport(this)">
+        <input type="file" id="img-input" accept="image/*" style="display:none" onchange="handleImport(this)">
       </div>
       <div id="import-status" style="margin-top:14px"></div>
       <div id="import-results"></div>
@@ -895,7 +895,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--green-60
         <div style="font-size:13px;font-weight:600;color:var(--green-800);margin:14px 0 8px">Option C — Photo or receipt 🧾</div>
         <div class="help-step">
           <div class="help-step-num">1</div>
-          <div class="help-step-content"><div class="help-step-desc">Go to <b>Import</b> → tap <b>Photo / Receipt</b></div></div>
+          <div class="help-step-content"><div class="help-step-desc">Go to <b>Import</b> → tap <b>Photo / Receipt</b> → choose to take a new photo or pick one from your photo library</div></div>
         </div>
         <div class="help-step">
           <div class="help-step-num">2</div>
