@@ -304,6 +304,22 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--green-60
 .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:200;display:flex;align-items:flex-end;justify-content:center}
 .modal-backdrop.hidden{display:none}
 .modal-sheet{background:var(--white);border-radius:20px 20px 0 0;padding:20px 20px 32px;width:100%;max-width:600px;max-height:85vh;overflow-y:auto}
+
+/* Floating action button — opens Add Price modal, stays fixed while scrolling */
+.fab{
+  position:fixed;bottom:88px;right:20px;z-index:150;
+  width:58px;height:58px;border-radius:50%;
+  background:var(--green-700);color:var(--white);border:none;
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 4px 14px rgba(0,0,0,0.25);cursor:pointer;
+  transition:transform 0.15s,box-shadow 0.15s;
+  -webkit-tap-highlight-color:transparent;
+}
+.fab:active{transform:scale(0.92)}
+.fab svg{width:26px;height:26px;stroke:currentColor;fill:none;stroke-width:2.5;stroke-linecap:round}
+.fab.hidden{display:none}
+/* Hide FAB when any tab other than Prices is active, or when a modal is open */
+body.modal-open .fab{display:none}
 .modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
 .modal-title{font-family:var(--font-heading);font-size:16px;font-weight:600;color:var(--green-800)}
 .modal-close{background:none;border:none;font-size:22px;cursor:pointer;color:var(--gray-400);padding:4px 8px;line-height:1}
@@ -481,56 +497,6 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--green-60
 <!-- ═══ PRICES TAB ═══ -->
 <div id="tab-prices" class="section active">
   <div class="content">
-    <div class="card">
-      <div class="card-title">Add a price</div>
-      <div class="field">
-        <label>Item name</label>
-        <input type="text" id="p-name" placeholder="e.g. Whole milk, 1 gallon" oninput="checkFuzzy(this.value)" autocomplete="off">
-        <div class="fuzzy-suggestion" id="fuzzy-hint" onclick="acceptFuzzy()"></div>
-      </div>
-      <div class="row-2">
-        <div class="field">
-          <label>Category</label>
-          <select id="p-cat">
-            <option>Dairy</option><option>Produce</option><option>Meat &amp; Seafood</option>
-            <option>Pantry</option><option>Frozen</option><option>Bakery</option>
-            <option>Beverages</option><option>Snacks</option><option>Other</option>
-          </select>
-        </div>
-        <div class="field">
-          <label>Store</label>
-          <select id="p-store"></select>
-        </div>
-      </div>
-      <div class="row-2">
-        <div class="field">
-          <label>Price ($)</label>
-          <input type="number" id="p-price" placeholder="0.00" step="0.01" min="0" inputmode="decimal">
-        </div>
-        <div class="field">
-          <label>Date</label>
-          <input type="date" id="p-date">
-        </div>
-      </div>
-      <div style="margin-top:4px">
-        <label style="font-size:13px;color:var(--gray-500);display:block;margin-bottom:6px">Size <span style="font-weight:400;color:var(--gray-400)">(for $/unit compare — optional)</span></label>
-        <div class="row-2">
-          <div class="field" style="margin-bottom:0">
-            <input type="number" id="p-size" placeholder="Amount (e.g. 28)" step="any" min="0" inputmode="decimal" oninput="this.dataset.userEdited='1'">
-          </div>
-          <div class="field" style="margin-bottom:0">
-            <select id="p-size-unit">
-              <option value="oz">oz</option>
-              <option value="lb">lb</option>
-              <option value="g">g</option>
-              <option value="ml">ml</option>
-              <option value="ct">count (ct)</option>
-            </select>
-          </div>
-        </div>
-      </div>
-      <button class="btn btn-primary" id="btn-add-entry" onclick="addEntry()">+ Add price entry</button>
-    </div>
     <div class="search-bar">
       <input type="text" id="price-search" placeholder="🔍 Search items…" oninput="debouncedRenderPrices()" autocomplete="off" style="width:100%">
       <select id="price-sort" onchange="renderPrices()">
@@ -558,6 +524,68 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--green-60
     </div>
     <div id="prices-list" aria-live="polite" aria-label="Price entries"></div>
     <div class="bottom-spacer"></div>
+  </div>
+</div>
+
+<!-- Floating Action Button — opens Add Price bottom sheet, stays visible while scrolling -->
+<button class="fab" id="add-price-fab" onclick="openAddPriceModal()" title="Add a price" aria-label="Add a price">
+  <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+</button>
+
+<!-- ADD PRICE MODAL — bottom sheet, same pattern as chart/merge modals -->
+<div class="modal-backdrop hidden" id="add-price-modal" onclick="closeAddPriceModal(event)">
+  <div class="modal-sheet" role="dialog" aria-modal="true" aria-labelledby="add-price-modal-title">
+    <div class="modal-header">
+      <div class="modal-title" id="add-price-modal-title">Add a price</div>
+      <button class="modal-close" onclick="closeAddPriceModal()">✕</button>
+    </div>
+    <div class="field">
+      <label>Item name</label>
+      <input type="text" id="p-name" placeholder="e.g. Whole milk, 1 gallon" oninput="checkFuzzy(this.value)" autocomplete="off">
+      <div class="fuzzy-suggestion" id="fuzzy-hint" onclick="acceptFuzzy()"></div>
+    </div>
+    <div class="row-2">
+      <div class="field">
+        <label>Category</label>
+        <select id="p-cat">
+          <option>Dairy</option><option>Produce</option><option>Meat &amp; Seafood</option>
+          <option>Pantry</option><option>Frozen</option><option>Bakery</option>
+          <option>Beverages</option><option>Snacks</option><option>Other</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Store</label>
+        <select id="p-store"></select>
+      </div>
+    </div>
+    <div class="row-2">
+      <div class="field">
+        <label>Price ($)</label>
+        <input type="number" id="p-price" placeholder="0.00" step="0.01" min="0" inputmode="decimal">
+      </div>
+      <div class="field">
+        <label>Date</label>
+        <input type="date" id="p-date">
+      </div>
+    </div>
+    <div style="margin-top:4px">
+      <label style="font-size:13px;color:var(--gray-500);display:block;margin-bottom:6px">Size <span style="font-weight:400;color:var(--gray-400)">(for $/unit compare — optional)</span></label>
+      <div class="row-2">
+        <div class="field" style="margin-bottom:0">
+          <input type="number" id="p-size" placeholder="Amount (e.g. 28)" step="any" min="0" inputmode="decimal" oninput="this.dataset.userEdited='1'">
+        </div>
+        <div class="field" style="margin-bottom:0">
+          <select id="p-size-unit">
+            <option value="oz">oz</option>
+            <option value="lb">lb</option>
+            <option value="g">g</option>
+            <option value="ml">ml</option>
+            <option value="ct">count (ct)</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="btn-add-entry" onclick="addEntry()" style="margin-top:14px">+ Add price entry</button>
   </div>
 </div>
 
@@ -866,7 +894,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--green-60
         <div style="font-size:13px;font-weight:600;color:var(--green-800);margin-bottom:8px">Option A — Type it in manually</div>
         <div class="help-step">
           <div class="help-step-num">1</div>
-          <div class="help-step-content"><div class="help-step-desc">Go to the <b>Prices</b> tab</div></div>
+          <div class="help-step-content"><div class="help-step-desc">Go to the <b>Prices</b> tab and tap the green ➕ button (bottom right)</div></div>
         </div>
         <div class="help-step">
           <div class="help-step-num">2</div>
@@ -1850,6 +1878,19 @@ window.setUnitDisplay = function(unit) {
   renderPrices();
 };
 
+// Replace the first size mention in a name with a corrected value+unit.
+// Used when the user edits the Size form field but the name text still
+// has the old (often AI-misread) number, e.g. "Item 75 Oz" -> "Item 7.5 Oz".
+function replaceSizeInName(name, newVal, newUnit) {
+  const unitWord = { oz:'oz', lb:'lb', g:'g', ml:'ml', ct:'ct' }[newUnit] || 'oz';
+  const pattern = /(\d+(\.\d+)?)\s*(oz|ounce|lb|pound|g|ml|count|ct|pack|pk)\b/i;
+  if (pattern.test(name)) {
+    return name.replace(pattern, `${newVal} ${unitWord}`);
+  }
+  // No existing size mention to replace — leave name as-is
+  return name;
+}
+
 function extractSize(name) {
   if (!name) return null;
   const ozMatch  = name.match(/(\d+(\.\d+)?)\s*(oz|ounce)/i);
@@ -2038,19 +2079,17 @@ function addEntry() {
   const sEl = document.getElementById('p-size');
   if (sEl) { sEl.value = ''; delete sEl.dataset.userEdited; }
   document.getElementById('fuzzy-hint').style.display = 'none';
-  setTimeout(() => {
-    setLoading('btn-add-entry', false);
-    document.getElementById('p-name').focus();
-  }, 350); // slightly after debounce fires
+  setTimeout(() => setLoading('btn-add-entry', false), 350);
   // Bug 2 fix: use prevPrice (captured before mutation) not existing.price (already updated)
   toast(prevPrice !== null
     ? `Updated: $${prevPrice.toFixed(2)} → $${price.toFixed(2)}`
     : 'Entry added!');
+  closeAddPriceModal();
 
   // Nice-to-have: flash the updated card
   if (prevPrice !== null) {
     const updated = db.entries.find(e => e.name === normalizedName && e.store === store);
-    if (updated) setTimeout(() => flashCard(updated.id), 80);
+    if (updated) setTimeout(() => flashCard(updated.id), 250);
   }
 }
 
@@ -2068,10 +2107,9 @@ function duplicateEntry(id) {
   // Close any open edit overlay first
   document.querySelectorAll('.edit-overlay.open').forEach(el => el.classList.remove('open'));
 
-  // Switch to Prices tab — this rebuilds the DOM
-  showTab('prices');
+  // Open the Add Price modal pre-filled with this entry's details
+  openAddPriceModal();
 
-  // Wait for tab switch and DOM rebuild before filling the form
   setTimeout(() => {
     const nameEl  = document.getElementById('p-name');
     const priceEl = document.getElementById('p-price');
@@ -2105,18 +2143,33 @@ function duplicateEntry(id) {
       }
     }
 
-    // Also pre-select the last-used store so user just needs to change if different
     refreshStoreSelects();
-
-    // Scroll to top then focus price field
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-    setTimeout(() => {
-      priceEl?.focus();
-      toast('📋 Name copied — select store and enter price');
-    }, 300);
-  }, 100); // wait for tab DOM rebuild
+    priceEl?.focus();
+    toast('📋 Name copied — select store and enter price');
+  }, 150); // wait for modal open animation/DOM
 }
 window.duplicateEntry = duplicateEntry;
+
+// Add Price modal open/close — the form lives inside this bottom sheet now,
+// reachable from the floating + button on the Prices tab, or from the
+// "duplicate" action on any existing entry.
+function openAddPriceModal() {
+  document.getElementById('add-price-modal').classList.remove('hidden');
+  document.body.classList.add('modal-open');
+  if (!document.getElementById('p-date').value) {
+    document.getElementById('p-date').value = today();
+  }
+  refreshStoreSelects();
+  setTimeout(() => document.getElementById('p-name')?.focus(), 200);
+}
+window.openAddPriceModal = openAddPriceModal;
+
+function closeAddPriceModal(e) {
+  if (e && e.target !== document.getElementById('add-price-modal')) return;
+  document.getElementById('add-price-modal').classList.add('hidden');
+  document.body.classList.remove('modal-open');
+}
+window.closeAddPriceModal = closeAddPriceModal;
 
 function startEdit(id) {
   const sid = String(id);
@@ -2176,8 +2229,17 @@ function saveEdit(id) {
     const size     = fromForm || fromName ||
                      (e.sizeOz ? { value: e.sizeOz, unit: e.sizeUnit || 'oz' } : null);
 
+    // If the Size field was edited (fromForm) and the name ALSO has a size
+    // mention that no longer matches, update the size text inside the name
+    // too — otherwise the displayed name keeps showing the stale number
+    // (e.g. name says "75 Oz" but Size field was corrected to 7.5).
+    let finalName = newName;
+    if (fromForm && fromName && Math.abs(fromForm.value - fromName.value) > 0.01) {
+      finalName = replaceSizeInName(newName, formVal, formUnit);
+    }
+
     e.price     = newPrice;
-    e.name      = normalizeItemName(newName);
+    e.name      = normalizeItemName(finalName);
     e.cat       = cat;
     e.date      = newDate;
     e.sizeOz    = size ? size.value : null;
@@ -2488,7 +2550,7 @@ function entryCardHtml(e, cache) {
         data-name="${safeName}"
         title="${inList?'Already on list':'Add to shopping list'}"
         ${inList?'style="color:var(--green-600)"':''}>
-        <svg viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
+        <svg viewBox="0 0 24 24"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6"/></svg>
       </button>
       <button class="icon-btn" onclick="startEdit(${eid})" title="Edit">
         <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
@@ -2972,6 +3034,9 @@ function showTab(tab) {
   if (tab === 'settings') renderStores();
   if (tab === 'list')     renderShoppingList();
   refreshStoreSelects();
+  // FAB only makes sense on the Prices tab — hide it everywhere else
+  const fab = document.getElementById('add-price-fab');
+  if (fab) fab.classList.toggle('hidden', tab !== 'prices');
 }
 
 // Toggle collapsible help sections
