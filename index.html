@@ -2191,6 +2191,12 @@ function saveEdit(id) {
   const newName  = document.getElementById('en-' + sid).value.trim();
   const newCat   = document.getElementById('ec-' + sid)?.value || entry.cat || 'Other';
   const newDate  = document.getElementById('ed-' + sid)?.value?.trim() || today();
+
+  // Store — read by store ID from the edit dropdown
+  const storeSelect  = document.getElementById('est-' + sid);
+  const newStoreId   = storeSelect ? storeSelect.value : null;
+  const newStoreObj  = newStoreId ? db.stores.find(s => String(s.id) === String(newStoreId)) : null;
+  const newStoreName = newStoreObj ? newStoreObj.name : entry.store;
   if (newDate && !/^\d{4}-\d{2}-\d{2}$/.test(newDate)) {
     return toast('Date must be in YYYY-MM-DD format (e.g. 2026-06-03)');
   }
@@ -2242,6 +2248,8 @@ function saveEdit(id) {
     e.name      = normalizeItemName(finalName);
     e.cat       = cat;
     e.date      = newDate;
+    e.store     = newStoreName;
+    e.storeId   = newStoreId || e.storeId;
     e.sizeOz    = size ? size.value : null;
     e.sizeUnit  = size ? size.unit  : null;
     e.unitPrice = size ? newPrice / size.value : null;
@@ -2515,6 +2523,11 @@ function entryCardHtml(e, cache) {
     `<option value="${c}" ${(e.cat||'Other')===c?'selected':''}>${c}</option>`
   ).join('');
 
+  // Store options for inline edit dropdown — matches by storeId then falls back to name
+  const storeOpts = db.stores.map(s =>
+    `<option value="${s.id}" ${(e.storeId ? e.storeId === s.id : e.store === s.name) ? 'selected' : ''}>${escapeHtml(s.name)}</option>`
+  ).join('');
+
   // Safely encode id for onclick attrs — UUIDs contain hyphens which break
   // unquoted JS like removeEntry(abc-123-def) (parsed as subtraction).
   // Use single-quoted string so it doesn't conflict with the attribute's double quotes.
@@ -2572,6 +2585,7 @@ function entryCardHtml(e, cache) {
         <input type="text"   id="en-${e.id}" value="${safeName}" placeholder="Item name">
         <input type="number" id="ep-${e.id}" value="${e.price.toFixed(2)}" step="0.01" placeholder="Price">
         <select id="ec-${e.id}">${catOpts}</select>
+        <select id="est-${e.id}">${storeOpts}</select>
       </div>
       <div class="edit-date-row">
         <label>Date (YYYY-MM-DD):</label>
